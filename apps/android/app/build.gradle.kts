@@ -51,4 +51,5 @@ dependencies {
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")  // QR 카메라 스캔
     implementation("androidx.biometric:biometric:1.1.0")            // 생체인증 잠금
     implementation("androidx.fragment:fragment-ktx:1.8.1")          // FragmentActivity(BiometricPrompt)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")  // Keystore 기반 암호화 저장
 }

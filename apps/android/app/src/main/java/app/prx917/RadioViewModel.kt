@@ -32,7 +32,7 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
         5 to "921.3", 6 to "922.1", 7 to "922.9", 8 to "923.5"
     )
 
-    private var me = Identity.generate()                 // 실제 crypto_core 신원
+    private var me = IdentityStore.loadOrCreate(app)      // Keystore에서 복원 또는 신규 생성
     private val transport = NearbyTransport(app, callsign, this)
     private var session: SecureSession? = null
     private var theirKey = ""
@@ -56,7 +56,7 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
         transport.stop()
         session = null; theirKey = ""; safetyConfirmed = false
         discovered.clear(); messages.clear(); linked.value = false
-        me = Identity.generate()
+        me = IdentityStore.reset(getApplication())        // 저장소에서도 새 신원으로 교체
     }
 
     fun selectChannel(n: Int) {
