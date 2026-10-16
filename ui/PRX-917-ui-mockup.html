@@ -1,0 +1,517 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>PRX-917 앱 목업</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* 레이아웃: 중앙 폰 디바이스 1대 — 내부에서 7개 화면 라우팅 + 하단 탭바 */
+  :root{
+    --bg:#e8e6dd; --surface:#f3f1ea; --fg:#211e17; --muted:#6b6553; --line:#9c9480;
+    --accent:#5e6e2f; --accent-2:#b07d28;
+    --chrome:#2f3422; --bezel:#1b1e14;
+    --scr:#0c0f0a; --scr-fg:#ecc978; --scr-dim:#8f8a5e; --scr-line:#2a2d1d;
+    --scr-green:#8fae5a; --scr-red:#d4703f;
+    --font-display:"Chakra Petch",system-ui,sans-serif;
+    --font-mono:"IBM Plex Mono",ui-monospace,monospace;
+    --font-body:system-ui,-apple-system,"Segoe UI",sans-serif;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+    --bg:#14130d; --surface:#1d1b14; --fg:#e9e5d6; --muted:#9b9680; --line:#4b4636;
+    --accent:#8aa048; --accent-2:#e0a53a; color-scheme:dark;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#14130d; --surface:#1d1b14; --fg:#e9e5d6; --muted:#9b9680; --line:#4b4636;
+    --accent:#8aa048; --accent-2:#e0a53a; color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--fg);font-family:var(--font-body);line-height:1.5}
+  .wrap{max-width:720px;margin:0 auto;min-height:100%;
+    padding-left:max(16px,env(safe-area-inset-left,0px));
+    padding-right:max(16px,env(safe-area-inset-right,0px));
+    padding-block:clamp(18px,4vw,36px);
+    display:flex;flex-direction:column;align-items:center;gap:16px}
+  .intro{text-align:center;max-width:46ch}
+  .intro .desig{font-family:var(--font-mono);font-size:.7rem;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--accent-2)}
+  .intro h1{font-family:var(--font-display);font-weight:700;font-size:clamp(1.4rem,5vw,1.9rem);
+    margin:4px 0 6px;text-wrap:balance}
+  .intro p{margin:0;color:var(--muted);font-size:.88rem}
+
+  /* 디바이스 */
+  .device{width:min(382px,100%);background:var(--chrome);border:3px solid var(--bezel);
+    border-radius:34px;padding:12px;box-shadow:0 18px 50px rgba(0,0,0,.28);display:flex;flex-direction:column}
+  .antenna{width:10px;height:26px;background:var(--bezel);border-radius:6px 6px 0 0;margin:-24px auto 0 40px}
+  .speaker{width:46px;height:5px;background:var(--bezel);border-radius:3px;margin:2px auto 8px}
+  .screen{background:var(--scr);border-radius:20px;overflow:hidden;height:620px;max-height:74vh;min-height:470px;
+    display:flex;flex-direction:column;font-family:var(--font-mono);color:var(--scr-fg);position:relative}
+
+  .statusbar{display:flex;align-items:center;gap:8px;padding:9px 14px;
+    border-bottom:1px solid var(--scr-line);font-size:.68rem;color:var(--scr-dim);flex:none}
+  .statusbar .name{font-family:var(--font-display);font-weight:600;color:var(--scr-fg);letter-spacing:.05em}
+  .statusbar .sp{margin-left:auto}
+  .bars{display:inline-flex;gap:2px;align-items:flex-end;height:11px}
+  .bars i{width:3px;background:var(--scr-green);border-radius:1px}
+  .bars i:nth-child(1){height:4px}.bars i:nth-child(2){height:7px}.bars i:nth-child(3){height:10px}.bars i:nth-child(4){height:11px;background:var(--scr-line)}
+  .batt{border:1px solid var(--scr-dim);border-radius:3px;width:20px;height:11px;position:relative;display:inline-block}
+  .batt::after{content:"";position:absolute;right:-3px;top:3px;width:2px;height:5px;background:var(--scr-dim)}
+  .batt i{position:absolute;inset:1px;width:66%;background:var(--scr-green);border-radius:1px}
+
+  .view{flex:1;overflow-y:auto;padding:16px 16px 18px;display:flex;flex-direction:column}
+  .view[hidden]{display:none!important}
+  .eyebrow{font-size:.64rem;letter-spacing:.16em;text-transform:uppercase;color:var(--scr-dim);
+    display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  .eyebrow::before{content:"";width:16px;height:2px;background:var(--scr-fg);opacity:.6}
+  .vtitle{font-family:var(--font-display);font-weight:600;color:var(--scr-fg);font-size:1.18rem;margin:0 0 14px}
+
+  .btn{font-family:var(--font-display);font-weight:600;border:none;border-radius:11px;padding:13px 16px;
+    font-size:.95rem;cursor:pointer;width:100%;letter-spacing:.02em}
+  .btn.primary{background:var(--scr-fg);color:#1a1405}
+  .btn.ghost{background:transparent;color:var(--scr-fg);border:1px solid var(--scr-line)}
+  .btn.danger{background:transparent;color:var(--scr-red);border:1px solid var(--scr-red)}
+  .btn:active{transform:translateY(1px)}
+  .row{display:flex;gap:10px}
+  .hint{margin-top:auto;font-size:.68rem;color:var(--scr-dim);text-align:center;padding-top:14px}
+
+  /* 채널 그리드 */
+  .chgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:4px}
+  .ch{background:var(--scr-line);color:var(--scr-fg);border:1px solid transparent;border-radius:12px;
+    padding:15px 12px;cursor:pointer;text-align:left;font-family:var(--font-mono)}
+  .ch:hover{border-color:var(--scr-fg)}
+  .ch .n{font-family:var(--font-display);font-weight:700;font-size:1.25rem;display:block}
+  .ch .f{font-size:.64rem;color:var(--scr-dim)}
+  .ch.sel{background:color-mix(in srgb,var(--scr-fg) 20%,var(--scr-line));border-color:var(--scr-fg)}
+
+  /* 스캔 목록 / 피어 */
+  .scanline{display:flex;align-items:center;gap:8px;font-size:.7rem;color:var(--scr-dim);margin-bottom:10px}
+  .pdot{width:6px;height:6px;border-radius:50%;background:var(--scr-green);animation:blink 1.2s infinite}
+  @keyframes blink{50%{opacity:.3}}
+  @media (prefers-reduced-motion:reduce){.pdot{animation:none}}
+  .peer{display:flex;align-items:center;gap:11px;background:var(--scr-line);border-radius:12px;padding:12px;margin-bottom:9px}
+  .peer .dot{width:9px;height:9px;border-radius:50%;background:var(--scr-green);flex:none}
+  .peer .pn{font-family:var(--font-display);font-weight:600;color:var(--scr-fg)}
+  .peer .pm{font-size:.62rem;color:var(--scr-dim)}
+  .peer .call{margin-left:auto;background:var(--scr-fg);color:#1a1405;border:none;border-radius:9px;
+    padding:8px 14px;font-family:var(--font-display);font-weight:600;cursor:pointer}
+  .peer .call:active{transform:translateY(1px)}
+  .sig{display:inline-flex;gap:2px;align-items:flex-end;height:10px;margin-left:2px}
+  .sig i{width:3px;background:var(--scr-green);border-radius:1px}
+  .sig.s1 i:nth-child(n+2){background:var(--scr-line)} .sig.s2 i:nth-child(n+3){background:var(--scr-line)}
+  .sig i:nth-child(1){height:4px}.sig i:nth-child(2){height:7px}.sig i:nth-child(3){height:10px}
+
+  /* 안전번호 */
+  .sn{background:var(--scr-line);border-radius:14px;padding:20px 16px;text-align:center;margin:8px 0 14px}
+  .sn .blocks{font-family:var(--font-mono);font-weight:600;font-size:1.45rem;letter-spacing:.1em;color:var(--scr-fg)}
+  .sn .lbl{font-size:.64rem;color:var(--scr-dim);text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px}
+  .ask{font-size:.84rem;color:var(--scr-fg);text-align:center;margin:0 0 14px}
+
+  /* 수신 호출 */
+  .incoming{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
+  .ring{width:88px;height:88px;border-radius:50%;background:var(--scr-line);display:grid;place-items:center;
+    font-size:2rem;position:relative}
+  .ring::before{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--scr-fg);
+    opacity:0;animation:ping 1.6s ease-out infinite}
+  @keyframes ping{0%{transform:scale(.9);opacity:.7}100%{transform:scale(1.25);opacity:0}}
+  @media (prefers-reduced-motion:reduce){.ring::before{animation:none;opacity:.25}}
+  .incoming .big{font-family:var(--font-display);font-weight:700;font-size:1.4rem;color:var(--scr-fg)}
+
+  /* QR / 신원 */
+  .qr{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:0;width:154px;height:154px;
+    background:#fff;padding:8px;border-radius:10px;margin:0 auto}
+  .qr div{background:#fff}.qr div.on{background:#131510}
+  .idcard{text-align:center;margin-bottom:14px}
+  .idcard .cs{font-family:var(--font-display);font-weight:700;font-size:1.5rem;color:var(--scr-fg)}
+  .idcard .fp{font-size:.66rem;color:var(--scr-dim);margin-top:2px;word-break:break-all}
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--scr-line);font-size:.84rem}
+  .kv:last-of-type{border-bottom:0}
+  .kv .k{color:var(--scr-dim)}
+  .kv .v{color:var(--scr-fg);font-family:var(--font-mono)}
+
+  /* 설정 토글 */
+  .toggle{position:relative;width:40px;height:22px;flex:none}
+  .toggle input{opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+  .track{position:absolute;inset:0;background:var(--scr-line);border-radius:11px;transition:.15s;pointer-events:none}
+  .track::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--scr-dim);transition:.15s}
+  .toggle input:checked + .track{background:color-mix(in srgb,var(--scr-green) 55%,var(--scr-line))}
+  .toggle input:checked + .track::after{left:20px;background:var(--scr-fg)}
+  .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+  .field label{font-size:.68rem;color:var(--scr-dim);text-transform:uppercase;letter-spacing:.1em}
+  .field input[type=text]{background:var(--scr);border:1px solid var(--scr-line);border-radius:9px;
+    color:var(--scr-fg);padding:10px 12px;font-family:var(--font-mono);font-size:.9rem}
+  .field input:focus{outline:none;border-color:var(--scr-fg)}
+
+  /* 채팅 */
+  .chead{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--scr-line);flex:none}
+  .chead .back{background:none;border:none;color:var(--scr-fg);cursor:pointer;font-size:1rem;padding:0 4px}
+  .chead .who{font-family:var(--font-display);font-weight:600;color:var(--scr-fg)}
+  .chead .sub{font-size:.6rem;color:var(--scr-dim)}
+  .chead .lock{margin-left:auto;font-size:.64rem;color:var(--scr-green)}
+  .linkbar{font-size:.66rem;padding:6px 14px;cursor:pointer;flex:none;border-bottom:1px solid var(--scr-line)}
+  .linkbar.ok{color:var(--scr-green)} .linkbar.bad{color:var(--scr-red)}
+  .msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px}
+  .sys{align-self:center;font-size:.62rem;color:var(--scr-dim);text-align:center;
+    border:1px dashed var(--scr-line);border-radius:8px;padding:5px 10px;max-width:92%}
+  .bub{max-width:78%;padding:8px 11px;border-radius:12px;font-size:.86rem;line-height:1.35;font-family:var(--font-body);word-wrap:break-word}
+  .bub .t{display:block;font-size:.56rem;color:var(--scr-dim);margin-top:3px;font-family:var(--font-mono)}
+  .bub.me{align-self:flex-end;background:var(--scr-fg);color:#1a1405;border-bottom-right-radius:4px}
+  .bub.me .t{color:#5a4a14}
+  .bub.them{align-self:flex-start;background:var(--scr-line);color:var(--scr-fg);border-bottom-left-radius:4px}
+  .composer{display:flex;gap:8px;padding:10px;border-top:1px solid var(--scr-line);flex:none}
+  .composer input{flex:1;min-width:0;background:var(--scr);border:1px solid var(--scr-line);border-radius:10px;
+    color:var(--scr-fg);padding:10px 12px;font-family:var(--font-body);font-size:.9rem}
+  .composer input:focus{outline:none;border-color:var(--scr-fg)}
+  .composer input:disabled{opacity:.5}
+  .ptt{flex:none;background:var(--accent-2);color:#1a1405;border:none;border-radius:10px;padding:0 16px;
+    font-family:var(--font-display);font-weight:700;cursor:pointer;letter-spacing:.04em}
+  .ptt:disabled{opacity:.45;cursor:not-allowed}
+  .ptt:active:not(:disabled){transform:translateY(1px)}
+
+  /* 탭바 */
+  .tabbar{display:flex;border-top:1px solid var(--scr-line);flex:none}
+  .tabbar[hidden]{display:none!important}
+  .tabbar button{flex:1;background:none;border:none;color:var(--scr-dim);cursor:pointer;padding:9px 4px;
+    font-family:var(--font-mono);font-size:.64rem;display:flex;flex-direction:column;align-items:center;gap:3px}
+  .tabbar button span{font-size:1.05rem;line-height:1}
+  .tabbar button.active{color:var(--scr-fg)}
+
+  /* 오버레이 / 토스트 */
+  .overlay{position:absolute;inset:0;background:color-mix(in srgb,var(--scr) 92%,transparent);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:5}
+  .overlay[hidden]{display:none!important}
+  .spin{width:40px;height:40px;border-radius:50%;border:3px solid var(--scr-line);border-top-color:var(--scr-fg);animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+  .overlay .t{font-size:.8rem;color:var(--scr-dim)}
+  .toast{position:absolute;left:50%;bottom:66px;transform:translateX(-50%);background:var(--scr-line);
+    color:var(--scr-fg);font-size:.72rem;padding:8px 14px;border-radius:9px;z-index:6;max-width:86%;text-align:center}
+  .toast[hidden]{display:none!important}
+
+  .footer{font-family:var(--font-mono);font-size:.66rem;color:var(--muted);text-align:center}
+</style>
+
+<div class="wrap">
+  <div class="intro">
+    <div class="desig">PRX-917 · 앱 UI 목업</div>
+    <h1>전술 보안 메신저 화면 흐름</h1>
+    <p>페어링 · 채널 · 다중 피어 스캔 · 호출/수신 · 안전번호 · 암호 교신 · 설정. 눌러서 체험하세요.</p>
+  </div>
+
+  <div class="device">
+    <div class="antenna"></div>
+    <div class="speaker"></div>
+    <div class="screen">
+      <div class="statusbar">
+        <span class="name">PRX-917</span>
+        <span id="sb-ch">CH —</span>
+        <span class="sp bars"><i></i><i></i><i></i><i></i></span>
+        <span class="batt"><i></i></span>
+      </div>
+
+      <!-- 잠금 (생체인증) -->
+      <section class="view" id="scr-lock" hidden style="align-items:center;justify-content:center;text-align:center;gap:12px">
+        <div class="ring" style="font-size:2.2rem">🙂</div>
+        <h2 class="vtitle" style="margin:6px 0 0">PRX-917 잠금</h2>
+        <p style="font-size:.8rem;color:var(--scr-dim);margin:0 0 8px">얼굴/지문으로 신원키를 잠금 해제</p>
+        <button class="btn primary" style="max-width:230px" onclick="unlock()">얼굴 인식으로 잠금 해제</button>
+        <button class="btn ghost" style="max-width:230px" onclick="unlock()">기기 비밀번호 사용</button>
+        <p class="hint" style="margin-top:14px">생체정보는 기기를 벗어나지 않습니다(OS Secure Enclave). 네트워크 인증엔 쓰이지 않습니다.</p>
+      </section>
+
+      <!-- 페어링 / 신원 -->
+      <section class="view" id="scr-identity" hidden>
+        <div class="eyebrow">페어링 · 신원</div>
+        <h2 class="vtitle">내 신원 (QR)</h2>
+        <div class="idcard">
+          <div class="cs">DELTA-6</div>
+          <div class="fp">IK: 7Qx9…a2F1</div>
+        </div>
+        <div class="qr" id="myqr"></div>
+        <p class="hint" style="margin:14px 0 4px">상대가 이 QR을 스캔하면 서로의 신원키를 교환합니다.</p>
+        <div class="row" style="margin-top:12px">
+          <button class="btn ghost" onclick="toast('지문 복사됨')">지문 복사</button>
+          <button class="btn primary" onclick="scanQR()">상대 QR 스캔</button>
+        </div>
+      </section>
+
+      <!-- 채널 -->
+      <section class="view" id="scr-channel" hidden>
+        <div class="eyebrow">무전 · 채널</div>
+        <h2 class="vtitle">통신 채널</h2>
+        <div class="chgrid" id="chgrid"></div>
+        <div class="hint">채널 = 통신망 프로파일. 같은 채널끼리만 교신합니다.</div>
+      </section>
+
+      <!-- 스캔 목록 (다중 피어) -->
+      <section class="view" id="scr-discovery" hidden>
+        <div class="eyebrow">무전 · 탐색</div>
+        <h2 class="vtitle" id="disc-title">주변 국(局) 탐색</h2>
+        <div class="scanline"><span class="pdot"></span><span id="scan-txt">CH 3 에서 교신 가능한 국을 수신 중…</span></div>
+        <div id="peerlist"></div>
+        <button class="btn ghost" style="margin-top:6px" onclick="simIncoming()">📨 수신 호출 시뮬레이션</button>
+        <div class="hint">탭 아래에서 채널/페어링/설정으로 이동할 수 있습니다.</div>
+      </section>
+
+      <!-- 수신 호출 -->
+      <section class="view" id="scr-incoming" hidden>
+        <div class="incoming">
+          <div class="ring">📡</div>
+          <div class="eyebrow" style="justify-content:center">수신 호출</div>
+          <div class="big" id="inc-name">ALPHA-2</div>
+          <div style="font-size:.72rem;color:var(--scr-dim)" id="inc-sub">CH 3 · 교신 요청</div>
+          <div class="row" style="width:100%;margin-top:18px">
+            <button class="btn danger" onclick="go('discovery')">거절</button>
+            <button class="btn primary" onclick="acceptCall()">수락</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 안전번호 -->
+      <section class="view" id="scr-safety" hidden>
+        <div class="eyebrow">중간자 방어</div>
+        <h2 class="vtitle">안전번호 확인</h2>
+        <div class="sn">
+          <div class="lbl">Safety Number · <span id="sn-peer">ALPHA-2</span></div>
+          <div class="blocks" id="sn-blocks">48217 90533 16724 20518 77364 10942</div>
+        </div>
+        <p class="ask">상대 기기 화면의 숫자와 <b>완전히 같나요?</b><br>같으면 중간자(도청자)가 없습니다.</p>
+        <div class="row">
+          <button class="btn danger" onclick="safetyMismatch()">불일치</button>
+          <button class="btn primary" onclick="go('chat')">일치 · 확인</button>
+        </div>
+        <div class="hint">최초 1회만. 이후 같은 국은 자동 신뢰합니다.</div>
+      </section>
+
+      <!-- 채팅 -->
+      <section class="view" id="scr-chat" hidden style="padding:0">
+        <div class="chead">
+          <button class="back" onclick="go('discovery')" aria-label="뒤로">←</button>
+          <div>
+            <div class="who" id="chat-who">ALPHA-2</div>
+            <div class="sub" id="chat-sub">CH 3 · 암호화됨</div>
+          </div>
+          <span class="lock">🔒 E2E</span>
+        </div>
+        <div class="linkbar ok" id="linkbar" onclick="toggleLink()">🟢 링크 연결됨 · 탭하여 끊기(테스트)</div>
+        <div class="msgs" id="msgs"></div>
+        <form class="composer" id="composer" autocomplete="off">
+          <input id="msgin" placeholder="메시지 입력…" aria-label="메시지">
+          <button class="ptt" type="submit" id="pttbtn">전송</button>
+        </form>
+      </section>
+
+      <!-- 설정 -->
+      <section class="view" id="scr-settings" hidden>
+        <div class="eyebrow">설정</div>
+        <h2 class="vtitle">설정</h2>
+        <div class="field">
+          <label for="set-cs">내 콜사인</label>
+          <input type="text" id="set-cs" value="DELTA-6">
+        </div>
+        <div class="kv"><span class="k">기본 채널</span><span class="v">CH 3 · 919.5 MHz</span></div>
+        <div class="kv"><span class="k">신뢰한 국 자동 연결</span>
+          <span class="toggle"><input type="checkbox" checked><span class="track"></span></span></div>
+        <div class="kv"><span class="k">메시지 24h 후 자동 삭제</span>
+          <span class="toggle"><input type="checkbox"><span class="track"></span></span></div>
+        <div class="kv"><span class="k">수신 알림음</span>
+          <span class="toggle"><input type="checkbox" checked><span class="track"></span></span></div>
+        <div class="kv"><span class="k">생체인증 잠금 (Face ID/지문)</span>
+          <span class="toggle"><input type="checkbox" checked><span class="track"></span></span></div>
+        <div class="kv"><span class="k">암호 스택</span><span class="v">X25519 · ChaCha20</span></div>
+        <div class="kv"><span class="k">버전</span><span class="v">0.1 · concept</span></div>
+        <button class="btn danger" style="margin-top:16px" id="regenBtn" onclick="regenAsk()">신원키 재생성</button>
+        <div id="regenConfirm" hidden style="margin-top:10px">
+          <p class="ask" style="color:var(--scr-red);text-align:left">정말 재생성할까요? 기존 모든 세션·신뢰·안전번호가 초기화되고, 상대와 다시 페어링해야 합니다.</p>
+          <div class="row">
+            <button class="btn ghost" onclick="regenCancel()">취소</button>
+            <button class="btn danger" onclick="regenDo()">재생성</button>
+          </div>
+        </div>
+        <div class="hint">재생성 시 기존 모든 세션과 신뢰가 초기화됩니다.</div>
+      </section>
+
+      <div class="overlay" id="overlay" hidden><div class="spin"></div><div class="t" id="overlay-txt">연결 중…</div></div>
+      <div class="toast" id="toast" hidden></div>
+    </div>
+
+    <nav class="tabbar" id="tabbar">
+      <button data-tab="channel" onclick="go('channel')"><span>📡</span>무전</button>
+      <button data-tab="identity" onclick="go('identity')"><span>🪪</span>페어링</button>
+      <button data-tab="settings" onclick="go('settings')"><span>⚙</span>설정</button>
+    </nav>
+  </div>
+
+  <div class="footer">PRX-917 · 목업 · 모든 교신은 종단간 암호화(개념)</div>
+</div>
+
+<script>
+(function(){
+  var CH=[[1,"917.1"],[2,"918.3"],[3,"919.5"],[4,"920.7"],[5,"921.3"],[6,"922.1"],[7,"922.9"],[8,"923.5"]];
+  var PEERS=[["ALPHA-2","신호 강 · 미확인",3],["BRAVO-7","신호 중 · 신뢰됨",2],["CHARLIE-1","신호 약 · 미확인",1]];
+  var channel=3, peerName="ALPHA-2";
+  var views=["lock","identity","channel","discovery","incoming","safety","chat","settings"];
+  var flowTab={discovery:"channel",incoming:"channel",safety:"channel",chat:"channel"};
+  var hideNav={lock:true,incoming:true,safety:true,chat:true};
+
+  // 채널 그리드
+  var grid=document.getElementById("chgrid");
+  CH.forEach(function(c){
+    var b=document.createElement("button");
+    b.className="ch"+(c[0]===channel?" sel":"");
+    b.innerHTML='<span class="n">CH '+c[0]+'</span><span class="f">'+c[1]+' MHz</span>';
+    b.onclick=function(){ selectChannel(c[0]); };
+    grid.appendChild(b);
+  });
+  function chFreq(n){ for(var i=0;i<CH.length;i++) if(CH[i][0]===n) return CH[i][1]; return ""; }
+
+  function selectChannel(n){
+    channel=n;
+    document.querySelectorAll(".ch").forEach(function(el,i){ el.classList.toggle("sel",CH[i][0]===n); });
+    document.getElementById("sb-ch").textContent="CH "+n;
+    document.getElementById("scan-txt").textContent="CH "+n+" 에서 교신 가능한 국을 수신 중…";
+    renderPeers();
+    go("discovery");
+  }
+
+  function renderPeers(){
+    var box=document.getElementById("peerlist"); box.innerHTML="";
+    PEERS.forEach(function(p){
+      var sig='<span class="sig s'+p[2]+'"><i></i><i></i><i></i></span>';
+      var el=document.createElement("div"); el.className="peer";
+      el.innerHTML='<span class="dot"></span><div><div class="pn">'+p[0]+'</div>'
+        +'<div class="pm">'+p[1]+' '+sig+'</div></div>'
+        +'<button class="call">호출</button>';
+      el.querySelector(".call").onclick=function(){ callPeer(p[0]); };
+      box.appendChild(el);
+    });
+  }
+
+  // 안전번호(콜사인별 의사 생성)
+  function safetyFor(name){
+    var h=2166136261; var s="DELTA-6|"+name;
+    for(var i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); }
+    var out=[];
+    for(var b=0;b<6;b++){ h^=h<<13;h^=h>>>17;h^=h<<5; out.push(("0000"+((h>>>0)%100000)).slice(-5)); }
+    return out.join(" ");
+  }
+
+  window.go=function(id){
+    views.forEach(function(v){ document.getElementById("scr-"+v).hidden=(v!==id); });
+    var tb=document.getElementById("tabbar"); tb.hidden=!!hideNav[id];
+    var active=flowTab[id]||id;
+    tb.querySelectorAll("button").forEach(function(b){ b.classList.toggle("active",b.dataset.tab===active); });
+    if(id==="identity") ensureQR();
+    if(id==="chat") seedChat();
+  };
+
+  window.callPeer=function(name){
+    peerName=name;
+    showOverlay("연결 중… (Wi-Fi Direct)");
+    setTimeout(function(){ setOverlay("프리키 교환 · 세션 수립…"); },900);
+    setTimeout(function(){ hideOverlay(); openSafety(name); },1900);
+  };
+  window.simIncoming=function(){
+    document.getElementById("inc-name").textContent="ALPHA-2";
+    document.getElementById("inc-sub").textContent="CH "+channel+" · 교신 요청";
+    go("incoming");
+  };
+  window.acceptCall=function(){
+    peerName="ALPHA-2";
+    showOverlay("세션 수립 중…");
+    setTimeout(function(){ hideOverlay(); openSafety("ALPHA-2"); },1400);
+  };
+  function openSafety(name){
+    document.getElementById("sn-peer").textContent=name;
+    document.getElementById("sn-blocks").textContent=safetyFor(name);
+    go("safety");
+  }
+  window.safetyMismatch=function(){
+    go("discovery");
+    toast("⚠ 안전번호 불일치 — 중간자 의심. 연결을 끊었습니다.");
+  };
+
+  // 오버레이/토스트
+  function showOverlay(t){ document.getElementById("overlay").hidden=false; setOverlay(t); }
+  function setOverlay(t){ document.getElementById("overlay-txt").textContent=t; }
+  function hideOverlay(){ document.getElementById("overlay").hidden=true; }
+  var toastTimer;
+  window.toast=function(msg){ var t=document.getElementById("toast"); t.textContent=msg; t.hidden=false;
+    clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.hidden=true; },2600); };
+
+  window.scanQR=function(){ showOverlay("QR 스캔 중…"); setTimeout(function(){ hideOverlay();
+    renderPeers(); go("discovery"); toast("ALPHA-2 신원키 수신 — 교신 가능"); },1400); };
+
+  // QR
+  var qrDone=false;
+  function ensureQR(){ if(qrDone) return; qrDone=true; renderQR(document.getElementById("myqr"),"PRX917-DELTA-6-IK-7Qx9a2F1"); }
+  function renderQR(el,seed){
+    var N=21; el.style.setProperty("--n",N);
+    var h=2166136261; for(var i=0;i<seed.length;i++){ h^=seed.charCodeAt(i); h=Math.imul(h,16777619); }
+    function rnd(){ h^=h<<13;h^=h>>>17;h^=h<<5; return (h>>>0)/4294967296; }
+    function finder(r,c){ function f(r0,c0){ var rr=r-r0,cc=c-c0; if(rr<0||cc<0||rr>6||cc>6) return null;
+        var ring=(rr===0||rr===6||cc===0||cc===6), ctr=(rr>=2&&rr<=4&&cc>=2&&cc<=4); return ring||ctr; }
+      var a=f(0,0); if(a!==null) return a; var b=f(0,N-7); if(b!==null) return b; var d=f(N-7,0); return d; }
+    el.innerHTML="";
+    for(var r=0;r<N;r++) for(var c=0;c<N;c++){
+      var on, fv=finder(r,c);
+      on = (fv!==null) ? fv : (rnd()>0.5);
+      var cell=document.createElement("div"); if(on) cell.className="on"; el.appendChild(cell);
+    }
+  }
+
+  // 채팅
+  var seeded=false, linked=true;
+  var replies=["교신 양호.","현 위치 이상 무.","수신 확인. 대기한다.","좌표 접수했다.","상황 공유 바람."];
+  function seedChat(){
+    document.getElementById("chat-who").textContent=peerName;
+    document.getElementById("chat-sub").textContent="CH "+channel+" · 암호화됨";
+    if(seeded) return; seeded=true;
+    sys("CH "+channel+" · "+peerName+"와 암호화 세션 수립 · 안전번호 확인됨");
+    them("현 위치 이상 무."); me("수신 양호. 좌표 송신 바람.");
+  }
+  function msgEl(cls,text){
+    var d=document.createElement("div"); d.className="bub "+cls;
+    var n=new Date(), hh=("0"+n.getHours()).slice(-2), mm=("0"+n.getMinutes()).slice(-2);
+    d.innerHTML=text.replace(/</g,"&lt;")+'<span class="t">'+hh+':'+mm+(cls==="me"?" ✓✓":"")+'</span>';
+    document.getElementById("msgs").appendChild(d); scrollMsgs();
+  }
+  function me(t){ msgEl("me",t); } function them(t){ msgEl("them",t); }
+  function sys(t){ var d=document.createElement("div"); d.className="sys"; d.textContent=t;
+    document.getElementById("msgs").appendChild(d); scrollMsgs(); }
+  function scrollMsgs(){ var m=document.getElementById("msgs"); m.scrollTop=m.scrollHeight; }
+
+  window.toggleLink=function(){ linked?disconnect():reconnect(); };
+  function setLink(ok){
+    linked=ok; var bar=document.getElementById("linkbar");
+    bar.className="linkbar "+(ok?"ok":"bad");
+    bar.textContent=ok?"🟢 링크 연결됨 · 탭하여 끊기(테스트)":"🔴 링크 끊김 · 탭하여 재연결";
+    document.getElementById("msgin").disabled=!ok;
+    document.getElementById("pttbtn").disabled=!ok;
+  }
+  function disconnect(){ setLink(false); sys("링크 끊김 — 상대 신호 소실"); }
+  function reconnect(){ showOverlay("재연결 중…"); setTimeout(function(){ hideOverlay(); setLink(true);
+    sys("링크 복구됨 · 세션 유지"); },1400); }
+
+  document.getElementById("composer").addEventListener("submit",function(e){
+    e.preventDefault(); if(!linked) return;
+    var inp=document.getElementById("msgin"); var v=inp.value.trim(); if(!v) return;
+    me(v); inp.value="";
+    setTimeout(function(){ if(linked) them(replies[Math.floor(Math.random()*replies.length)]); },900);
+  });
+
+  // 생체 잠금 / 신원키 재생성
+  window.unlock=function(){ go("channel"); toast("잠금 해제됨"); };
+  window.regenAsk=function(){ document.getElementById("regenConfirm").hidden=false; document.getElementById("regenBtn").hidden=true; };
+  window.regenCancel=function(){ document.getElementById("regenConfirm").hidden=true; document.getElementById("regenBtn").hidden=false; };
+  window.regenDo=function(){
+    regenCancel(); seeded=false;
+    var m=document.getElementById("msgs"); if(m) m.innerHTML="";
+    var r=function(){ return Math.random().toString(36).slice(2,6); };
+    document.querySelector(".idcard .fp").textContent="IK: "+r()+"…"+r();
+    qrDone=false;
+    toast("신원키 재생성됨 — 모든 세션·신뢰 초기화");
+  };
+
+  // 시작 화면
+  renderPeers();
+  go("lock");
+})();
+</script>

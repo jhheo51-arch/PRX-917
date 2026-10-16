@@ -1,0 +1,42 @@
+name: iOS Build
+
+# Mac 없이 클라우드 macOS 러너에서 빌드(컴파일 검증). 수동 실행 + main 푸시 시.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "crypto_core/**"
+      - "transport/ios/**"
+      - "apps/ios/**"
+      - ".github/workflows/ios.yml"
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust Apple 타깃 설치
+        run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+
+      - name: XCFramework 빌드
+        run: bash apps/ios/scripts/build-xcframework.sh
+
+      - name: XcodeGen 설치
+        run: brew install xcodegen
+
+      - name: Xcode 프로젝트 생성
+        working-directory: apps/ios
+        run: xcodegen generate
+
+      - name: 앱 빌드 (시뮬레이터 · 무서명)
+        working-directory: apps/ios
+        run: |
+          xcodebuild \
+            -project PRX917.xcodeproj \
+            -scheme PRX917 \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build

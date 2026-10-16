@@ -112,6 +112,6 @@ mod tests {
         let a = alice.curve25519_key().to_bytes();
         let b = bob.curve25519_key().to_bytes();
         assert_eq!(safety_number(&a, &b), safety_number(&b, &a));
-        assert_eq!(safety_number(&a, &b).split(' ').count(), 3);
+        assert_eq!(safety_number(&a, &b).split(' ').count(), 6);
     }
 }

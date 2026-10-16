@@ -1,0 +1,47 @@
+name: PRX917
+options:
+  bundleIdPrefix: app.prx917
+  deploymentTarget:
+    iOS: "15.0"
+
+targets:
+  PRX917:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: ../../crypto_core/bindings/swift/crypto_core.swift
+      - path: ../../transport/ios/MultipeerTransport.swift
+    dependencies:
+      - framework: ../../crypto_core/ios/CryptoCore.xcframework
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.prx917.messenger
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        # MultipeerConnectivity 권한 (로컬 네트워크 + Bonjour 서비스 등록)
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "주변 기기와 오프그리드로 교신하기 위해 사용합니다."
+    info:
+      path: Sources/Info.plist
+      properties:
+        NSLocalNetworkUsageDescription: "주변 기기와 오프그리드로 교신하기 위해 사용합니다."
+        NSBonjourServices:
+          - _prx917-ch1._tcp
+          - _prx917-ch1._udp
+          - _prx917-ch2._tcp
+          - _prx917-ch2._udp
+          - _prx917-ch3._tcp
+          - _prx917-ch3._udp
+          - _prx917-ch4._tcp
+          - _prx917-ch4._udp
+          - _prx917-ch5._tcp
+          - _prx917-ch5._udp
+          - _prx917-ch6._tcp
+          - _prx917-ch6._udp
+          - _prx917-ch7._tcp
+          - _prx917-ch7._udp
+          - _prx917-ch8._tcp
+          - _prx917-ch8._udp

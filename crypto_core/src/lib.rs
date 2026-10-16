@@ -40,8 +40,9 @@ pub fn safety_number(a_pub: &[u8; 32], b_pub: &[u8; 32]) -> String {
     h.update(lo);
     h.update(hi);
     let digest = h.finalize();
-    // 앞 15바이트를 5바이트씩 끊어 사람이 대조하기 쉬운 5자리 숫자 3블록으로 만든다.
-    digest[..15]
+    // 앞 30바이트를 5바이트씩 끊어 사람이 대조하기 쉬운 5자리 숫자 6블록으로 만든다.
+    // (6블록 ≈ 100비트 — 중간자가 충돌 키쌍을 만들기 비현실적인 수준)
+    digest[..30]
         .chunks(5)
         .map(|c| {
             let n = u64::from_be_bytes([0, 0, 0, c[0], c[1], c[2], c[3], c[4]]);
@@ -129,9 +130,9 @@ mod tests {
         let (_, b_pub) = generate_identity();
         let sn = safety_number(&a_pub, &b_pub);
         assert_eq!(sn, safety_number(&a_pub, &b_pub)); // 매번 같은 값
-        // "NNNNN NNNNN NNNNN" — 5자리 3블록
+        // "NNNNN × 6" — 5자리 6블록
         let blocks: Vec<&str> = sn.split(' ').collect();
-        assert_eq!(blocks.len(), 3);
+        assert_eq!(blocks.len(), 6);
         assert!(blocks.iter().all(|b| b.len() == 5 && b.chars().all(|c| c.is_ascii_digit())));
     }
 
