@@ -11,7 +11,7 @@ import app.prx917.transport.RadioTransportListener
 import uniffi.crypto_core.Identity
 import uniffi.crypto_core.SecureSession
 
-enum class Screen { LOCK, CHANNEL, DISCOVERY, SAFETY, CHAT }
+enum class Screen { LOCK, CHANNEL, DISCOVERY, SAFETY, CHAT, PAIRING, SETTINGS }
 data class ChatMsg(val mine: Boolean, val text: String)
 
 /** crypto_core(Identity/SecureSession) + NearbyTransport 를 잇는 앱 상태. */
@@ -31,13 +31,32 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
         5 to "921.3", 6 to "922.1", 7 to "922.9", 8 to "923.5"
     )
 
-    private val me = Identity.generate()                 // 실제 crypto_core 신원
+    private var me = Identity.generate()                 // 실제 crypto_core 신원
     private val transport = NearbyTransport(app, callsign, this)
     private var session: SecureSession? = null
     private var theirKey = ""
     private var safetyConfirmed = false
 
+    /** 내 신원 공개키(base64) — QR 페어링에 사용. */
+    fun myPublicKey(): String = me.publicKey()
+    /** 화면 표시용 짧은 지문. */
+    fun myFingerprint(): String {
+        val k = me.publicKey()
+        return "IK: " + k.take(6) + "…" + k.takeLast(4)
+    }
+
     fun unlock() { screen.value = Screen.CHANNEL }
+    fun goChannel() { screen.value = Screen.CHANNEL }
+    fun goPairing() { screen.value = Screen.PAIRING }
+    fun goSettings() { screen.value = Screen.SETTINGS }
+
+    /** 신원키 재생성 — 기존 세션·신뢰 초기화 후 새 Identity 생성. */
+    fun regenerate() {
+        transport.stop()
+        session = null; theirKey = ""; safetyConfirmed = false
+        discovered.clear(); messages.clear(); linked.value = false
+        me = Identity.generate()
+    }
 
     fun selectChannel(n: Int) {
         channel.value = n

@@ -47,4 +47,5 @@ dependencies {
     implementation("com.google.android.gms:play-services-nearby:19.3.0")
     implementation("net.java.dev.jna:jna:5.14.0@aar")   // UniFFI Kotlin 런타임
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("com.google.zxing:core:3.5.3")       // QR 생성(페어링)
 }
