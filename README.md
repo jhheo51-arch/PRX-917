@@ -49,11 +49,25 @@ PRX-917/
 │   │   └─ ffi.rs             UniFFI 노출 래퍼
 │   └─ bindings/             생성된 Swift·Kotlin 바인딩
 ├─ transport/
-│   ├─ android/NearbyTransport.kt     Nearby Connections (참고 구현)
-│   └─ ios/MultipeerTransport.swift   MultipeerConnectivity (참고 구현)
+│   ├─ android/NearbyTransport.kt     Nearby Connections 전송
+│   └─ ios/MultipeerTransport.swift   MultipeerConnectivity 전송
+├─ apps/
+│   ├─ android/              ✅ 빌드되는 앱 (Kotlin + Compose) → app-debug.apk
+│   └─ ios/                  SwiftUI 앱 소스 (빌드는 macOS/Xcode 필요)
+├─ ui/
+│   └─ PRX-917-ui-mockup.html  인터랙티브 UI 목업(7화면)
 └─ hardware/
     └─ PRX-917-concept.html   러기드 핸드셋 3D/평면도 컨셉
 ```
+
+## 플랫폼 앱
+
+| 플랫폼 | 상태 | 빌드 |
+|---|---|---|
+| **Android** | ✅ 디버그 APK 빌드 성공 (crypto_core .so 임베드) | 이 저장소에서 `apps/android` → [가이드](apps/android/README.md) |
+| **iOS** | 소스·CI 준비 완료 | macOS/Xcode 또는 GitHub Actions → [가이드](apps/ios/README.md) |
+
+> Android ↔ iOS 는 서로 다른 오프그리드 전송(Nearby vs Multipeer)이라 현재는 같은 플랫폼끼리만 교신한다.
 
 ---
 
@@ -164,8 +178,8 @@ cargo run --bin uniffi-bindgen -- generate --library target\debug\crypto_core.dl
 - **프레임 태그**: `K`(프리키) · `P`(PreKey wire) · `N`(일반 wire)
 - 전송 경로가 도청돼도 내용은 Double Ratchet로 보호 — 전송 계층은 바이트 왕복만 담당
 
-> 전송 참고 구현은 Android/iOS SDK가 필요해 이 저장소에선 **컴파일하지 않았다**.
-> 실제 앱 프로젝트(Android Studio / Xcode)에 넣고 권한·수명주기를 붙여야 동작한다.
+> Android 전송은 `apps/android` 앱에 통합되어 **APK로 빌드된다**. iOS 전송은 `apps/ios`에
+> 통합돼 있으나 빌드에 macOS/Xcode가 필요하다.
 
 ---
 
@@ -178,13 +192,17 @@ cargo run --bin uniffi-bindgen -- generate --library target\debug\crypto_core.dl
 
 ## 로드맵
 
-- [x] 보안 코어 (신원 · Double Ratchet · AEAD · 저장) — 테스트 23
+- [x] 보안 코어 (신원 · Double Ratchet · AEAD · 저장) — 테스트 23, 안전번호 ~100비트
 - [x] UniFFI 바인딩 (Swift / Kotlin)
-- [x] 전송 계층 설계 + 참고 구현
+- [x] 전송 계층 (Nearby Connections / MultipeerConnectivity)
+- [x] UI 목업 (7화면 · 생체잠금)
 - [x] 하드웨어 컨셉 (3D/평면도)
-- [ ] 앱 UI (채널 다이얼 · 안전번호 · 채팅)
-- [ ] OS별 네이티브 라이브러리 빌드 (iOS=macOS/Xcode, Android=NDK)
-- [ ] 실기기 통합 테스트
+- [x] **Android 앱 빌드** (crypto_core .so 임베드 → app-debug.apk)
+- [x] iOS 앱 소스 + 클라우드 CI
+- [ ] Android UI 다듬기 (목업 수준 디자인·QR 페어링·설정·재연결)
+- [ ] BiometricPrompt / Keystore 생체 게이팅 실연동
+- [ ] iOS 네이티브 빌드 (macOS/CI) · 실기기 통합 테스트
+- [ ] Android ↔ iOS 크로스 통신 (공통 BLE 전송)
 
 ---
 
