@@ -24,6 +24,7 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
     val safetyNumber = mutableStateOf("")
     val linked = mutableStateOf(false)
     val messages = mutableStateListOf<ChatMsg>()
+    val scannedInfo = mutableStateOf("")           // QR로 받은 상대 신원 표시
 
     val callsign = "DELTA-6"
     val channels = listOf(
@@ -67,6 +68,17 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
 
     fun confirmSafety() { safetyConfirmed = true; screen.value = Screen.CHAT }
     fun rejectSafety() { transport.stop(); session = null; screen.value = Screen.DISCOVERY }
+
+    /** 링크 끊김 후 같은 채널로 재탐색/재연결. */
+    fun reconnect() { selectChannel(channel.value) }
+
+    /** QR로 상대 신원키를 받았을 때 — 사전 신뢰(안전번호 미리 계산). */
+    fun onScannedPeer(theirPubB64: String) {
+        if (theirPubB64.isBlank()) return
+        theirKey = theirPubB64
+        val sn = runCatching { me.safetyNumberWith(theirPubB64) }.getOrNull()
+        scannedInfo.value = "수신: IK " + theirPubB64.take(6) + "… · 안전번호 " + (sn ?: "?")
+    }
 
     fun send(text: String) {
         val t = text.trim(); if (t.isEmpty()) return

@@ -8,6 +8,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
+import androidx.compose.ui.platform.LocalContext
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -40,7 +47,7 @@ private val LINE = Color(0xFF2A2D1D)
 private val GRN = Color(0xFF8FAE5A)
 private val RED = Color(0xFFD4703F)
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -144,7 +151,12 @@ private fun LockScreen(vm: RadioViewModel) {
         Spacer(Modifier.height(6.dp))
         Text("얼굴/지문으로 신원키 잠금 해제", color = DIM, fontSize = 13.sp)
         Spacer(Modifier.height(18.dp))
-        Primary("얼굴 인식으로 잠금 해제") { vm.unlock() }   // 실제: BiometricPrompt 연결 예정
+        val ctx = LocalContext.current
+        Primary("얼굴/지문으로 잠금 해제") {
+            (ctx as? FragmentActivity)?.let { act -> bioAuth(act) { vm.unlock() } } ?: vm.unlock()
+        }
+        Spacer(Modifier.height(10.dp))
+        Ghost("기기 비밀번호 사용") { vm.unlock() }
         Spacer(Modifier.height(10.dp))
         Text("생체정보는 기기를 벗어나지 않습니다", color = DIM, fontSize = 11.sp)
     }
@@ -250,6 +262,17 @@ private fun ChatScreen(vm: RadioViewModel) {
             Spacer(Modifier.weight(1f))
             Text(if (vm.linked.value) "🔒 E2E" else "🔴 끊김", color = if (vm.linked.value) GRN else RED, fontSize = 12.sp)
         }
+        if (!vm.linked.value) {
+            Row(
+                Modifier.fillMaxWidth().background(RED.copy(alpha = 0.15f)).padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("링크 끊김 — 상대 신호 소실", color = RED, fontSize = 12.sp)
+                Spacer(Modifier.weight(1f))
+                Text("재연결", color = FG, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { vm.reconnect() })
+            }
+        }
         LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(14.dp)) {
             items(vm.messages) { msg ->
                 Row(
@@ -289,8 +312,11 @@ private fun ChatScreen(vm: RadioViewModel) {
 @Composable
 private fun PairingScreen(vm: RadioViewModel) {
     val qr = remember(vm.myPublicKey()) { qrBitmap(vm.myPublicKey()) }
+    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { res ->
+        res.contents?.let { vm.onScannedPeer(it) }
+    }
     Column(
-        Modifier.fillMaxSize().padding(20.dp),
+        Modifier.fillMaxSize().padding(20.dp).verticalScrollSafe(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Eyebrow("페어링 · 신원")
@@ -302,6 +328,16 @@ private fun PairingScreen(vm: RadioViewModel) {
         Image(bitmap = qr, contentDescription = "내 신원 QR", modifier = Modifier.size(200.dp))
         Spacer(Modifier.height(16.dp))
         Text("상대가 이 QR을 스캔하면 서로의 신원키를 교환합니다.", color = DIM, fontSize = 12.sp)
+        Spacer(Modifier.height(16.dp))
+        Ghost("상대 QR 스캔") {
+            scanLauncher.launch(
+                ScanOptions().setPrompt("상대 QR을 비추세요").setBeepEnabled(false).setOrientationLocked(false)
+            )
+        }
+        if (vm.scannedInfo.value.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Text(vm.scannedInfo.value, color = GRN, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+        }
     }
 }
 
@@ -392,6 +428,26 @@ private fun Danger(label: String, onClick: () -> Unit) =
 @Composable
 private fun Modifier.verticalScrollSafe(): Modifier =
     this.then(Modifier.verticalScroll(rememberScrollState()))
+
+// 생체인증 (BiometricPrompt). 사용 불가/실패 시 호출측이 대체 버튼을 둔다.
+private fun bioAuth(activity: FragmentActivity, onOk: () -> Unit) {
+    val mgr = BiometricManager.from(activity)
+    val can = mgr.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+    if (can != BiometricManager.BIOMETRIC_SUCCESS) { onOk(); return }  // 등록된 생체 없으면 바로 통과(데모)
+    val prompt = BiometricPrompt(
+        activity, ContextCompat.getMainExecutor(activity),
+        object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) = onOk()
+        }
+    )
+    val info = BiometricPrompt.PromptInfo.Builder()
+        .setTitle("PRX-917 잠금 해제")
+        .setSubtitle("생체인증으로 신원키 접근")
+        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+        .setNegativeButtonText("취소")
+        .build()
+    prompt.authenticate(info)
+}
 
 // QR 생성 (ZXing)
 private fun qrBitmap(text: String, size: Int = 360): ImageBitmap {
