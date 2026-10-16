@@ -7,6 +7,17 @@
 
 ---
 
+## 이름의 의미
+
+| 요소 | 뜻 |
+|---|---|
+| **PRX** | **P**ortable **R**adio e**X**change — 휴대형 무전 교신기. 군 제식명 `AN/PRC` 계열의 느낌을 살린 오마주이되, 실제 제식명과는 무관한 독자 명칭. |
+| **917** | 국내 LoRa **ISM 대역의 시작 주파수 917MHz**. 합법적으로 쓸 수 있는 주파수를 이름에 새겼다. |
+
+> PRC-999K 같은 군용 무전기에서 영감을 받았지만, 그 장비의 주파수 도약·암호 체계를 모방하거나 분석하지 않는다. "쓰기 쉽지만 보안이 우수한 무전기"라는 **목표**만 공유한다.
+
+---
+
 ## 🔗 라이브 데모 (브라우저에서 바로 열기)
 
 설치·로그인 없이 인터랙티브 버전을 바로 체험할 수 있다.
@@ -17,18 +28,6 @@
 | 📱 앱 UI 목업 | 7화면 흐름: 잠금 · 채널 · 탐색 · 안전번호 · 채팅 · 페어링 · 설정 | **[열기 ›](https://claude.ai/artifact/3eqwxyMdJUwBUu2mmthXnr?sk=Jlzx1ZH7sGGtZeuoQ5d52g)** |
 
 > 저장소의 `hardware/` · `ui/` 파일을 클론해 브라우저로 열어도 동일하게 동작한다.
-
----
-
-## 이름의 의미
-
-| 요소 | 뜻 |
-|---|---|
-| **PRX** | **P**ortable **R**adio e**X**change — 휴대형 무전 교신기. 군 제식명 `AN/PRC` 계열의 느낌을 살린 오마주이되, 실제 제식명과는 무관한 독자 명칭. |
-| **917** | 국내 LoRa **ISM 대역의 시작 주파수 917MHz**. 합법적으로 쓸 수 있는 주파수를 이름에 새겼다. |
-
-> PRC-999K 같은 군용 무전기에서 영감을 받았지만, 그 장비의 주파수 도약·암호 체계를
-> 모방하거나 분석하지 않는다. "쓰기 쉽지만 보안이 우수한 무전기"라는 **목표**만 공유한다.
 
 ---
 
@@ -200,9 +199,7 @@ cargo run --bin uniffi-bindgen -- generate --library target\debug\crypto_core.dl
 
 ![PRX-917 핸드셋 전면](hardware/PRX-917-front.svg)
 
-위는 정적 미리보기(SVG). **회전 가능한 3D 뷰**는 👉 **[라이브 데모 열기](https://claude.ai/artifact/DoyZZDnrNL3j2Vr6ASWRhV?sk=evS7C35cy5tOwU76yD5Ymg)**
-또는 [`hardware/PRX-917-concept.html`](hardware/PRX-917-concept.html)을 브라우저로 직접 열면 동작한다
-(GitHub는 인터랙티브 HTML을 렌더링하지 않는다). 소프트웨어 중심 프로젝트이므로 하드웨어는 개념 시각화 단계다.
+위는 정적 미리보기(SVG). **회전 가능한 3D 뷰**는 👉 **[라이브 데모 열기](https://claude.ai/artifact/DoyZZDnrNL3j2Vr6ASWRhV?sk=evS7C35cy5tOwU76yD5Ymg)** 또는 [`hardware/PRX-917-concept.html`](hardware/PRX-917-concept.html)을 브라우저로 직접 열면 동작한다(GitHub는 인터랙티브 HTML을 렌더링하지 않는다). 소프트웨어 중심 프로젝트이므로 하드웨어는 개념 시각화 단계다.
 
 **화면 구성**
 - **3D 뷰** — 국방색 섀시·코요테 범퍼·앰버 OLED·필드그린 노브/PTT의 전술 무전기 룩
@@ -215,9 +212,7 @@ cargo run --bin uniffi-bindgen -- generate --library target\debug\crypto_core.dl
 
 ## 앱 조작법 (UI 목업 + 실제 앱 공통 흐름)
 
-인터랙티브 목업: 👉 **[라이브 데모 열기](https://claude.ai/artifact/3eqwxyMdJUwBUu2mmthXnr?sk=Jlzx1ZH7sGGtZeuoQ5d52g)**
-또는 [`ui/PRX-917-ui-mockup.html`](ui/PRX-917-ui-mockup.html) (브라우저로 열어 눌러보기).
-실제 Android 앱(`apps/android`)도 동일한 흐름을 따른다.
+인터랙티브 목업: 👉 **[라이브 데모 열기](https://claude.ai/artifact/3eqwxyMdJUwBUu2mmthXnr?sk=Jlzx1ZH7sGGtZeuoQ5d52g)** 또는 [`ui/PRX-917-ui-mockup.html`](ui/PRX-917-ui-mockup.html) (브라우저로 열어 눌러보기). 실제 Android 앱(`apps/android`)도 동일한 흐름을 따른다.
 
 ```
 ① 잠금 해제   얼굴/지문(생체인증) 또는 기기 비밀번호
