@@ -185,8 +185,11 @@ cargo run --bin uniffi-bindgen -- generate --library target\debug\crypto_core.dl
 
 ## 하드웨어 컨셉 (3D)
 
-러기드 핸드셋을 [`hardware/PRX-917-concept.html`](hardware/PRX-917-concept.html)에서 볼 수 있다
-(파일을 브라우저로 열기). 소프트웨어 중심 프로젝트이므로 하드웨어는 개념 시각화 단계다.
+![PRX-917 핸드셋 전면](hardware/PRX-917-front.svg)
+
+위는 정적 미리보기(SVG). **회전 가능한 3D 뷰**는 [`hardware/PRX-917-concept.html`](hardware/PRX-917-concept.html)을
+**브라우저로 직접 열어야** 동작한다(GitHub는 인터랙티브 HTML을 렌더링하지 않는다).
+소프트웨어 중심 프로젝트이므로 하드웨어는 개념 시각화 단계다.
 
 **화면 구성**
 - **3D 뷰** — 국방색 섀시·코요테 범퍼·앰버 OLED·필드그린 노브/PTT의 전술 무전기 룩
