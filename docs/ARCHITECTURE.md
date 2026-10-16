@@ -86,7 +86,7 @@
 | `crypto_core/src/ffi.rs` | UniFFI 래퍼(CoreError·Mutex·Vec<u8>) |
 | `crypto_core/bindings/` | Swift·Kotlin 생성물 |
 | `transport/` | 오프그리드 전송 설계 + 참고 구현 |
-| `concept/PRX-917-concept.html` | 하드웨어 3D/평면도 컨셉 |
+| `hardware/PRX-917-concept.html` | 하드웨어 3D/평면도 컨셉 |
 
 ## 8. 테스트 현황
 
