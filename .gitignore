@@ -1,0 +1,13 @@
+# Rust 빌드 산출물
+**/target/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp

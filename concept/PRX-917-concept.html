@@ -1,0 +1,403 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>PRX-917 핸드셋 컨셉</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* 레이아웃: 중앙 1열 스택 — 헤더 / 3D 히어로 / 기술 평면도+콜아웃 / 측면도 / 사양 / 각주 */
+  :root{
+    --bg:#e8e6dd; --surface:#f3f1ea; --surface-2:#dedbcf;
+    --fg:#211e17; --muted:#6b6553; --line:#9c9480; --grid:#cdc8b8;
+    --accent:#5e6e2f; --accent-2:#b07d28; --danger:#b4532a;
+    --font-display:"Chakra Petch",system-ui,sans-serif;
+    --font-mono:"IBM Plex Mono",ui-monospace,monospace;
+    --font-body:system-ui,-apple-system,"Segoe UI",sans-serif;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+    --bg:#14130d; --surface:#1d1b14; --surface-2:#26231a;
+    --fg:#e9e5d6; --muted:#9b9680; --line:#4b4636; --grid:#2b2820;
+    --accent:#8aa048; --accent-2:#e0a53a; --danger:#d4703f;
+    color-scheme:dark;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#14130d; --surface:#1d1b14; --surface-2:#26231a;
+    --fg:#e9e5d6; --muted:#9b9680; --line:#4b4636; --grid:#2b2820;
+    --accent:#8aa048; --accent-2:#e0a53a; --danger:#d4703f;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--fg);font-family:var(--font-body);line-height:1.5}
+  .wrap{max-width:980px;margin:0 auto;
+    padding-left:max(16px,env(safe-area-inset-left,0px));
+    padding-right:max(16px,env(safe-area-inset-right,0px));
+    padding-block:clamp(24px,5vw,56px)}
+  h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0;line-height:1.1}
+  .mono{font-family:var(--font-mono)}
+
+  /* 헤더 */
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px 24px;
+    border-bottom:1px solid var(--line);padding-bottom:20px}
+  .desig{font-family:var(--font-mono);font-size:.72rem;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+  header h1{font-size:clamp(2.4rem,8vw,4rem);font-weight:700;letter-spacing:.02em}
+  header p{margin:6px 0 0;color:var(--muted);max-width:52ch}
+  .tagstack{margin-left:auto;font-family:var(--font-mono);font-size:.74rem;
+    color:var(--muted);text-align:right;display:grid;gap:3px}
+  .tagstack b{color:var(--fg);font-weight:600}
+
+  section{margin-top:clamp(32px,6vw,56px)}
+  .eyebrow{font-family:var(--font-mono);font-size:.72rem;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:10px}
+  .eyebrow::before{content:"";width:22px;height:2px;background:var(--accent)}
+  section > h2{font-size:clamp(1.3rem,3.5vw,1.7rem);margin:10px 0 18px}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+
+  /* 3D 히어로 */
+  .hero{position:relative;overflow:hidden}
+  #stage{width:100%;aspect-ratio:16/11;max-width:100%;display:block;cursor:grab;touch-action:none}
+  #stage.drag{cursor:grabbing}
+  .hud{position:absolute;left:16px;bottom:14px;font-family:var(--font-mono);
+    font-size:.7rem;color:var(--muted);background:color-mix(in srgb,var(--surface) 75%,transparent);
+    padding:6px 10px;border-radius:8px;border:1px solid var(--line)}
+  .hud b{color:var(--accent-2)}
+  .corner{position:absolute;top:12px;right:14px;font-family:var(--font-mono);
+    font-size:.68rem;letter-spacing:.12em;color:var(--muted)}
+
+  /* 기술 평면도 */
+  .drawing{padding:18px 14px 8px}
+  svg.tech{width:100%;height:auto;display:block}
+  .tech .ln{fill:none;stroke:var(--fg);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+  .tech .thin{stroke-width:1.2}
+  .tech .fillpanel{fill:var(--surface-2);stroke:var(--fg);stroke-width:2}
+  .tech .screen{fill:color-mix(in srgb,var(--accent-2) 22%,var(--surface-2));stroke:var(--fg);stroke-width:2}
+  .tech .acc{fill:none;stroke:var(--accent);stroke-width:2}
+  .tech .accfill{fill:color-mix(in srgb,var(--accent) 30%,var(--surface));stroke:var(--accent);stroke-width:2}
+  .tech .hidden{fill:none;stroke:var(--danger);stroke-width:1.6;stroke-dasharray:5 4}
+  .tech .dim{stroke:var(--muted);stroke-width:1}
+  .tech .dimtxt{fill:var(--muted);font-family:var(--font-mono);font-size:13px}
+  .tech .lead{stroke:var(--line);stroke-width:1}
+  .tech .num{fill:var(--accent)}
+  .tech .numtxt{fill:var(--bg);font-family:var(--font-mono);font-size:13px;font-weight:600}
+  .tech .glow line{stroke:color-mix(in srgb,var(--accent-2) 60%,transparent);stroke-width:1.4}
+
+  /* 콜아웃 범례 */
+  .legend{margin-top:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1px;
+    background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .legend li{list-style:none;background:var(--surface);padding:12px 14px;display:flex;gap:11px}
+  .badge{flex:none;width:22px;height:22px;border-radius:50%;background:var(--accent);
+    color:var(--bg);font-family:var(--font-mono);font-weight:600;font-size:.78rem;
+    display:grid;place-items:center;margin-top:1px}
+  .legend .t{font-family:var(--font-display);font-weight:600;font-size:.95rem}
+  .legend .d{color:var(--muted);font-size:.82rem;margin-top:2px}
+  .legend .map{color:var(--accent-2);font-family:var(--font-mono);font-size:.72rem;margin-top:4px}
+
+  /* 2열(측면도 + 사양) */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:640px){.cols{grid-template-columns:1fr}}
+  .side{padding:18px}
+  .side h3{font-size:1rem;margin-bottom:12px;color:var(--muted);font-family:var(--font-mono);
+    font-weight:500;letter-spacing:.08em;text-transform:uppercase;font-size:.74rem}
+
+  table.spec{width:100%;border-collapse:collapse;font-size:.9rem}
+  .specwrap{padding:6px 18px 14px}
+  table.spec th,table.spec td{text-align:left;padding:9px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.spec th{font-family:var(--font-mono);font-weight:500;color:var(--muted);
+    font-size:.78rem;width:40%;white-space:nowrap}
+  table.spec td{font-family:var(--font-mono)}
+  table.spec tr:last-child th,table.spec tr:last-child td{border-bottom:0}
+  .pill{display:inline-block;font-family:var(--font-mono);font-size:.68rem;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--accent-2);border:1px solid var(--accent-2);
+    border-radius:999px;padding:2px 8px}
+
+  .note{margin-top:28px;border-left:3px solid var(--accent);background:var(--surface);
+    padding:14px 16px;border-radius:0 10px 10px 0;font-size:.86rem;color:var(--muted)}
+  .note b{color:var(--fg)}
+  footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--line);
+    font-family:var(--font-mono);font-size:.72rem;color:var(--muted);
+    display:flex;flex-wrap:wrap;gap:6px 18px;justify-content:space-between}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="desig">Portable Radio eXchange · 전술 보안 핸드셋</div>
+      <h1>PRX-917</h1>
+      <p>인터넷·기지국 없이 동작하는 1:1 종단간 암호화 텍스트 무전기. LoRa 오프그리드 통신에 Double Ratchet 보안을 얹은 개념 설계.</p>
+    </div>
+    <div class="tagstack">
+      <div>REV <b>0.1 — CONCEPT</b></div>
+      <div>BAND <b>917–923.5 MHz</b></div>
+      <div>CRYPTO <b>X25519 · ChaCha20</b></div>
+    </div>
+  </header>
+
+  <!-- 3D 히어로 -->
+  <section class="hero card">
+    <span class="corner mono">ISO VIEW</span>
+    <canvas id="stage"></canvas>
+    <div class="hud mono">드래그<b>로 회전</b> · 자동 회전 중</div>
+  </section>
+
+  <!-- 기술 평면도 -->
+  <section>
+    <div class="eyebrow">전면 평면도 / FRONT ELEVATION</div>
+    <h2>부품 배치</h2>
+    <div class="card drawing">
+      <svg class="tech" viewBox="0 0 760 520" role="img"
+           aria-label="PRX-917 전면 평면도와 부품 번호 콜아웃">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/>
+          </marker>
+        </defs>
+
+        <!-- 본체 외형 -->
+        <rect class="fillpanel" x="250" y="70" width="220" height="400" rx="26"/>
+        <!-- 러기드 범퍼(모서리) -->
+        <path class="acc" d="M250,96 q0,-26 26,-26"/>
+        <path class="acc" d="M470,96 q0,-26 -26,-26"/>
+        <path class="acc" d="M250,444 q0,26 26,26"/>
+        <path class="acc" d="M470,444 q0,26 -26,26"/>
+
+        <!-- 안테나 -->
+        <rect class="fillpanel" x="276" y="34" width="20" height="40" rx="7"/>
+        <!-- 채널 노브 -->
+        <circle class="accfill" cx="438" cy="54" r="17"/>
+        <line class="ln thin" x1="438" y1="54" x2="438" y2="40"/>
+        <!-- 상태 LED -->
+        <circle class="accfill" cx="360" cy="92" r="6"/>
+        <!-- OLED 디스플레이 -->
+        <rect class="screen" x="278" y="112" width="164" height="150" rx="6"/>
+        <g class="glow">
+          <line x1="292" y1="138" x2="418" y2="138"/>
+          <line x1="292" y1="162" x2="402" y2="162"/>
+          <line x1="292" y1="186" x2="428" y2="186"/>
+          <line x1="292" y1="232" x2="360" y2="232"/>
+        </g>
+        <!-- PTT(전송) 버튼: 측면이지만 전면에서 가장자리 표시 -->
+        <rect class="accfill" x="244" y="150" width="10" height="70" rx="4"/>
+        <!-- 키패드 -->
+        <g class="ln thin" fill="var(--surface)">
+          <!-- 4행 x 5열 미니 키 -->
+          <!-- row y: 286,330,374,418 ; col x:290..426 step 34 -->
+          <rect x="286" y="286" width="24" height="24" rx="5"/><rect x="320" y="286" width="24" height="24" rx="5"/><rect x="354" y="286" width="24" height="24" rx="5"/><rect x="388" y="286" width="24" height="24" rx="5"/><rect x="422" y="286" width="20" height="24" rx="5"/>
+          <rect x="286" y="320" width="24" height="24" rx="5"/><rect x="320" y="320" width="24" height="24" rx="5"/><rect x="354" y="320" width="24" height="24" rx="5"/><rect x="388" y="320" width="24" height="24" rx="5"/><rect x="422" y="320" width="20" height="24" rx="5"/>
+          <rect x="286" y="354" width="24" height="24" rx="5"/><rect x="320" y="354" width="24" height="24" rx="5"/><rect x="354" y="354" width="24" height="24" rx="5"/><rect x="388" y="354" width="24" height="24" rx="5"/><rect x="422" y="354" width="20" height="24" rx="5"/>
+          <rect x="286" y="388" width="24" height="24" rx="5"/><rect x="320" y="388" width="58" height="24" rx="5"/><rect x="388" y="388" width="24" height="24" rx="5"/><rect x="422" y="388" width="20" height="24" rx="5"/>
+        </g>
+        <!-- USB-C -->
+        <rect class="accfill" x="344" y="462" width="32" height="8" rx="4"/>
+        <!-- 보안 요소(내부, 점선) -->
+        <rect class="hidden" x="300" y="300" width="120" height="86" rx="6"/>
+
+        <!-- 치수선: 높이 -->
+        <line class="dim" x1="505" y1="70" x2="505" y2="470" marker-start="url(#ar)" marker-end="url(#ar)"/>
+        <line class="dim thin" x1="470" y1="70" x2="515" y2="70"/>
+        <line class="dim thin" x1="470" y1="470" x2="515" y2="470"/>
+        <text class="dimtxt" x="512" y="275" transform="rotate(90 512 275)" text-anchor="middle">155 mm</text>
+        <!-- 치수선: 폭 -->
+        <line class="dim" x1="250" y1="498" x2="470" y2="498" marker-start="url(#ar)" marker-end="url(#ar)"/>
+        <line class="dim thin" x1="250" y1="470" x2="250" y2="503"/>
+        <line class="dim thin" x1="470" y1="470" x2="470" y2="503"/>
+        <text class="dimtxt" x="360" y="516" text-anchor="middle">68 mm</text>
+
+        <!-- 콜아웃 (좌측) -->
+        <g>
+          <line class="lead" x1="286" y1="44" x2="150" y2="44"/><circle class="num" cx="138" cy="44" r="12"/><text class="numtxt" x="138" y="49" text-anchor="middle">1</text>
+          <line class="lead" x1="278" y1="180" x2="150" y2="180"/><circle class="num" cx="138" cy="180" r="12"/><text class="numtxt" x="138" y="185" text-anchor="middle">4</text>
+          <line class="lead" x1="244" y1="185" x2="150" y2="230"/><circle class="num" cx="138" cy="230" r="12"/><text class="numtxt" x="138" y="235" text-anchor="middle">5</text>
+          <line class="lead" x1="286" y1="330" x2="150" y2="330"/><circle class="num" cx="138" cy="330" r="12"/><text class="numtxt" x="138" y="335" text-anchor="middle">6</text>
+          <line class="lead" x1="300" y1="343" x2="150" y2="400"/><circle class="num" cx="138" cy="400" r="12"/><text class="numtxt" x="138" y="405" text-anchor="middle">7</text>
+        </g>
+        <!-- 콜아웃 (우측) -->
+        <g>
+          <line class="lead" x1="455" y1="54" x2="610" y2="54"/><circle class="num" cx="622" cy="54" r="12"/><text class="numtxt" x="622" y="59" text-anchor="middle">2</text>
+          <line class="lead" x1="366" y1="92" x2="610" y2="110"/><circle class="num" cx="622" cy="110" r="12"/><text class="numtxt" x="622" y="115" text-anchor="middle">3</text>
+          <line class="lead" x1="442" y1="230" x2="610" y2="230"/><circle class="num" cx="622" cy="230" r="12"/><text class="numtxt" x="622" y="235" text-anchor="middle">8</text>
+          <line class="lead" x1="376" y1="466" x2="610" y2="410"/><circle class="num" cx="622" cy="410" r="12"/><text class="numtxt" x="622" y="415" text-anchor="middle">9</text>
+        </g>
+      </svg>
+
+      <ul class="legend">
+        <li><span class="badge">1</span><div><div class="t">LoRa 안테나</div><div class="d">917–923.5MHz ISM 대역 송수신</div><div class="map">↔ PRC-999K 안테나</div></div></li>
+        <li><span class="badge">2</span><div><div class="t">채널 셀렉터 노브</div><div class="d">네트워크 프로파일(채널) 전환</div><div class="map">↔ 주파수 선택</div></div></li>
+        <li><span class="badge">3</span><div><div class="t">상태 LED</div><div class="d">링크 · 암호세션 · 배터리 표시</div></div></li>
+        <li><span class="badge">4</span><div><div class="t">OLED 디스플레이</div><div class="d">메시지 · 안전번호 · 채널 표시</div></div></li>
+        <li><span class="badge">5</span><div><div class="t">PTT / 전송 버튼</div><div class="d">메시지 전송 (무전기 감성)</div></div></li>
+        <li><span class="badge">6</span><div><div class="t">QWERTY 키패드</div><div class="d">텍스트 입력</div></div></li>
+        <li><span class="badge">7</span><div><div class="t">보안 요소 (내부)</div><div class="d">ATECC608 — 개인키 하드웨어 봉인</div><div class="map">↔ COMSEC 키 적재</div></div></li>
+        <li><span class="badge">8</span><div><div class="t">USB-C</div><div class="d">충전 · 데이터 · QR 페어링 보조</div></div></li>
+        <li><span class="badge">9</span><div><div class="t">마이크 / 스피커</div><div class="d">알림음 (옵션)</div></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 측면도 + 사양 -->
+  <section>
+    <div class="eyebrow">측면도 · 사양 / PROFILE · SPEC</div>
+    <h2>프로파일과 제원</h2>
+    <div class="cols">
+      <div class="card side">
+        <h3>좌측면도</h3>
+        <svg class="tech" viewBox="0 0 300 420" role="img" aria-label="PRX-917 좌측면도">
+          <!-- 두께 본체 -->
+          <rect class="fillpanel" x="120" y="70" width="60" height="300" rx="18"/>
+          <!-- 안테나 -->
+          <rect class="fillpanel" x="126" y="34" width="18" height="40" rx="6"/>
+          <!-- 노브(상단 돌출) -->
+          <rect class="accfill" x="150" y="48" width="24" height="18" rx="6"/>
+          <!-- PTT 측면 버튼 -->
+          <rect class="accfill" x="110" y="150" width="12" height="70" rx="4"/>
+          <!-- USB-C 하단 -->
+          <rect class="accfill" x="142" y="366" width="16" height="8" rx="4"/>
+          <!-- 전면 유리 라인 -->
+          <line class="ln thin" x1="120" y1="86" x2="120" y2="356"/>
+          <!-- 두께 치수 -->
+          <line class="dim" x1="120" y1="392" x2="180" y2="392" marker-start="url(#ar)" marker-end="url(#ar)"/>
+          <line class="dim thin" x1="120" y1="370" x2="120" y2="397"/>
+          <line class="dim thin" x1="180" y1="370" x2="180" y2="397"/>
+          <text class="dimtxt" x="150" y="410" text-anchor="middle">34 mm</text>
+          <!-- PTT 라벨 -->
+          <line class="lead" x1="110" y1="185" x2="40" y2="185"/>
+          <circle class="num" cx="28" cy="185" r="12"/><text class="numtxt" x="28" y="190" text-anchor="middle">5</text>
+        </svg>
+      </div>
+
+      <div class="card">
+        <div class="specwrap">
+          <p style="margin:12px 0 14px"><span class="pill">개념 사양 · 변동 가능</span></p>
+          <table class="spec">
+            <tr><th>통신 방식</th><td>LoRa CSS · 오프그리드</td></tr>
+            <tr><th>주파수</th><td>917–923.5 MHz (국내 ISM)</td></tr>
+            <tr><th>사거리(개활지)</th><td>약 2–5 km</td></tr>
+            <tr><th>보안</th><td>X25519 · Double Ratchet<br>ChaCha20-Poly1305</td></tr>
+            <tr><th>키 저장</th><td>ATECC608 보안 요소</td></tr>
+            <tr><th>전원</th><td>LiPo 1500 mAh · USB-C</td></tr>
+            <tr><th>치수</th><td>155 × 68 × 34 mm</td></tr>
+            <tr><th>무게</th><td>약 290 g</td></tr>
+            <tr><th>방호(목표)</th><td>IP67 · 러기드 범퍼</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="note">
+    <b>개념(컨셉) 설계입니다.</b> 치수·사거리·방호 등급은 목표치이며 실제 측정값이 아닙니다.
+    보안 코어(<span class="mono">crypto_core</span>)가 만든 <span class="mono">wire</span> 문자열을 LoRa 전송 계층에 그대로 실어 나르는 구조로,
+    소프트웨어는 이미 검증(테스트 18건 통과)되어 있습니다. 군용 장비를 분석·복제하지 않고 공개 암호 기술로 동일한 보안 목표를 달성합니다.
+  </div>
+
+  <footer>
+    <span>PRX-917 · REV 0.1 CONCEPT</span>
+    <span>PORTABLE RADIO EXCHANGE</span>
+    <span>917–923.5 MHz · OFF-GRID · E2E</span>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  var THREE = window.THREE;
+  var canvas = document.getElementById('stage');
+  if(!THREE || !canvas) return;
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true, alpha:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(32, 16/11, 0.1, 100);
+  camera.position.set(3.6, 2.2, 6.4);
+  camera.lookAt(0,0,0);
+
+  // 색
+  var OLIVE=0x3f4524, DARK=0x23231c, COYOTE=0x9a8a5c, FIELD=0x707e3a, AMBER=0xe0a53a, GLASS=0x241a08;
+
+  function mat(c,r,m){ return new THREE.MeshStandardMaterial({color:c, roughness:(r==null?0.82:r), metalness:(m==null?0.1:m)}); }
+  function box(w,h,d,material){ return new THREE.Mesh(new THREE.BoxGeometry(w,h,d), material); }
+
+  var device = new THREE.Group();
+
+  // 본체
+  var body = box(1.5, 3.2, 0.72, mat(OLIVE));
+  device.add(body);
+  // 전면 베젤
+  var bezel = box(1.3, 3.0, 0.06, mat(DARK,0.6));
+  bezel.position.z = 0.37; device.add(bezel);
+  // OLED 화면
+  var screen = box(1.02, 1.0, 0.04, new THREE.MeshStandardMaterial({color:GLASS, emissive:0x5a3c0e, emissiveIntensity:0.85, roughness:0.35}));
+  screen.position.set(0, 0.78, 0.40); device.add(screen);
+  // 화면 UI 라인
+  var lineMat = new THREE.MeshStandardMaterial({color:0xf0c268, emissive:0xa9741a, emissiveIntensity:0.95});
+  [[0.95,0.28],[0.8,0.16],[1.0,0.04],[0.5,-0.2]].forEach(function(r){
+    var l = box(0.72*r[0], 0.045, 0.01, lineMat);
+    l.position.set(-0.12+(0.36*(1-r[0])), 0.78+r[1], 0.43); screen.parent.add(l);
+  });
+  // 키패드 (4x5 미니 키)
+  var keyMat = mat(0x3b3b30,0.7);
+  for(var row=0; row<4; row++){
+    for(var col=0; col<5; col++){
+      var k = box(0.17,0.17,0.06, keyMat);
+      k.position.set(-0.46+col*0.23, -0.35-row*0.24, 0.39);
+      device.add(k);
+    }
+  }
+  // 안테나
+  var ant = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.08,1.1,16), mat(DARK,0.5));
+  ant.position.set(-0.52, 2.15, 0); device.add(ant);
+  var antTip = new THREE.Mesh(new THREE.SphereGeometry(0.1,16,12), mat(DARK,0.5));
+  antTip.position.set(-0.52, 2.72, 0); device.add(antTip);
+  // 채널 노브
+  var knob = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.22,24), mat(FIELD,0.6,0.15));
+  knob.position.set(0.42, 1.68, 0); device.add(knob);
+  // PTT 측면 버튼
+  var ptt = box(0.1, 0.62, 0.34, mat(FIELD,0.6,0.15));
+  ptt.position.set(-0.77, 0.3, 0); device.add(ptt);
+  // 러기드 범퍼 (네 모서리)
+  var bump = mat(COYOTE,0.9);
+  [[-0.75,1.6],[0.75,1.6],[-0.75,-1.6],[0.75,-1.6]].forEach(function(p){
+    var b = box(0.22,0.26,0.84, bump); b.position.set(p[0],p[1],0); device.add(b);
+  });
+  // 상태 LED
+  var led = new THREE.Mesh(new THREE.SphereGeometry(0.07,12,10),
+    new THREE.MeshStandardMaterial({color:0xff7b3a, emissive:0xff5a1a, emissiveIntensity:1.1}));
+  led.position.set(0.0, 1.46, 0.39); device.add(led);
+
+  device.rotation.y = -0.5; device.rotation.x = 0.12;
+  scene.add(device);
+
+  // 조명
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  var key = new THREE.DirectionalLight(0xffffff, 0.95); key.position.set(4,6,5); scene.add(key);
+  var fill = new THREE.DirectionalLight(0xffe4b0, 0.35); fill.position.set(-5,2,-3); scene.add(fill);
+  var rim = new THREE.DirectionalLight(0x9fb8ff, 0.4); rim.position.set(-2,3,-6); scene.add(rim);
+
+  function resize(){
+    var w = canvas.clientWidth, h = canvas.clientHeight;
+    if(w===0||h===0) return;
+    renderer.setSize(w,h,false);
+    camera.aspect = w/h; camera.updateProjectionMatrix();
+  }
+
+  // 드래그 회전
+  var dragging=false, px=0, py=0, auto=!reduce;
+  function down(e){ dragging=true; auto=false; canvas.classList.add('drag');
+    var p=e.touches?e.touches[0]:e; px=p.clientX; py=p.clientY; }
+  function move(e){ if(!dragging) return; var p=e.touches?e.touches[0]:e;
+    device.rotation.y += (p.clientX-px)*0.01; device.rotation.x += (p.clientY-py)*0.01;
+    device.rotation.x = Math.max(-0.8, Math.min(0.9, device.rotation.x));
+    px=p.clientX; py=p.clientY; if(e.cancelable) e.preventDefault(); }
+  function up(){ dragging=false; canvas.classList.remove('drag'); }
+  canvas.addEventListener('mousedown',down); window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+  canvas.addEventListener('touchstart',down,{passive:false}); canvas.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
+
+  window.addEventListener('resize', resize);
+  resize();
+  (function loop(){
+    requestAnimationFrame(loop);
+    if(auto) device.rotation.y += 0.004;
+    resize();
+    renderer.render(scene, camera);
+  })();
+})();
+</script>
