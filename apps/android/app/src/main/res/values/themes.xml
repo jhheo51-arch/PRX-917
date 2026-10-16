@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose가 실제 테마를 그리므로 프레임워크 NoActionBar 테마만 둔다 -->
+    <style name="Theme.PRX917" parent="android:Theme.Material.NoActionBar" />
+</resources>

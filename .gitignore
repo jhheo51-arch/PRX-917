@@ -11,3 +11,13 @@ desktop.ini
 .vscode/
 *.iml
 *.swp
+
+# Android / Gradle (생성물)
+.gradle/
+**/build/
+apps/android/local.properties
+apps/android/app/src/main/jniLibs/
+
+# iOS (생성물)
+crypto_core/ios/
+apps/ios/*.xcodeproj/
