@@ -37,11 +37,15 @@ private object Inner {
         data class Msg(val id: String, val text: String) : Parsed()
         data class Ack(val id: String) : Parsed()
         data class Legacy(val text: String) : Parsed()
+        object Hello : Parsed()
     }
+    /** 세션 개시 신호. initiator 가 세션을 열자마자 보내 responder 도 곧바로 송신할 수 있게 한다. */
+    const val HELLO = "S"
     fun newId() = "%08x".format(Random.nextInt())
     fun msg(id: String, text: String) = "M$id$text"
     fun ack(id: String) = "A$id"
     fun parse(s: String): Parsed {
+        if (s == HELLO) return Parsed.Hello
         val id = s.drop(1).take(8)
         if (s.length >= 9 && HEX8.matches(id)) {
             if (s[0] == 'M') return Parsed.Msg(id, s.substring(9))
@@ -118,6 +122,7 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
     /** 무효화된 신원 삭제 — 다음 인증 때 새 신원이 생성된다. */
     fun resetIdentity() {
         IdentityStore.wipe(getApplication())
+        Settings.clearVerifiedPairs(getApplication())   // 새 신원이면 모든 상대와 재확인
         needsReset.value = false
         lockMsg.value = "신원을 삭제했습니다. 다시 인증하면 새 신원키가 생성됩니다."
     }
@@ -249,8 +254,11 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
 
     fun send(text: String) {
         val t = text.trim(); if (t.isEmpty()) return
-        val s = session ?: return
         val id = Inner.newId()
+        val s = session ?: run {
+            // 세션 수립 전(연결 직후 몇 초) — 조용히 버리지 않고 미전달로 표시
+            addMessage(ChatMsg(true, t, id = id, status = Delivery.FAILED)); return
+        }
         transport.send(s.encrypt(Inner.msg(id, t).toByteArray()).toByteArray())
         addMessage(ChatMsg(true, t, id = id, status = Delivery.PENDING))
         // 10초 안에 ACK 가 없으면 미전달
@@ -314,7 +322,12 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
     private fun handle(frame: ByteArray) = runCatching {
         val s = frame.decodeToString()
         when (s.firstOrNull()) {
-            'K' -> session = me.openSession(theirKey, s.substring(1))     // initiator
+            'K' -> {                                                         // initiator
+                val sess = me.openSession(theirKey, s.substring(1))
+                session = sess
+                // 곧바로 개시 신호를 보내 responder 쪽 세션도 수립시킨다 (먼저 말 걸 수 있도록)
+                transport.send(sess.encrypt(Inner.HELLO.toByteArray()).toByteArray())
+            }
             'P' -> {
                 // 상대가 답을 받기 전 연달아 보낸 PreKey 메시지는 기존 세션으로 푼다
                 val existing = session?.let { runCatching { it.decrypt(s) }.getOrNull() }
@@ -339,6 +352,7 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
                 if (seenIds.add(p.id)) addMessage(ChatMsg(false, p.text, id = p.id))
             }
             is Inner.Parsed.Ack -> setStatus(p.id, Delivery.DELIVERED)
+            Inner.Parsed.Hello -> Unit                                   // 세션 수립용, 표시 안 함
             is Inner.Parsed.Legacy -> addMessage(ChatMsg(false, p.text))
         }
     }

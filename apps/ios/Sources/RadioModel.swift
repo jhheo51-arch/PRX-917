@@ -26,6 +26,10 @@ enum InnerFrame {
     case message(id: String, text: String)
     case ack(id: String)
     case legacy(String)
+    case hello
+
+    /// 세션 개시 신호. initiator 가 세션을 열자마자 보내 responder 도 곧바로 송신할 수 있게 한다.
+    static let helloText = "S"
 
     static func newId() -> String { String(format: "%08x", UInt32.random(in: .min ... .max)) }
 
@@ -34,6 +38,7 @@ enum InnerFrame {
     }
 
     static func parse(_ t: String) -> InnerFrame {
+        if t == helloText { return .hello }
         guard let tag = t.first else { return .legacy(t) }
         let rest = t.dropFirst()
         let id = rest.prefix(8)
@@ -265,11 +270,21 @@ final class RadioModel: ObservableObject, RadioTransportListener {
     /// 신원키 재생성/초기화 경로를 만들 때도 반드시 호출할 것.
     func clearVerifiedPeers() { VerifiedPeers.clear() }
 
+    /// 신원키 재생성 — 기존 신원·검증 기록 삭제 후 잠금. 다시 인증하면 새 신원키가 생성된다.
+    func regenerate() {
+        IdentityStore.wipe()
+        lock(reason: "신원키를 삭제했습니다. 인증하면 새 신원키가 생성됩니다.")
+    }
+
     func send(_ text: String) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let id = InnerFrame.newId()
-        guard !t.isEmpty, let sess = session,
-              let wire = try? sess.encrypt(plaintext: Data(("M" + id + t).utf8)) else { return }
+        guard !t.isEmpty else { return }
+        guard let sess = session,
+              let wire = try? sess.encrypt(plaintext: Data(("M" + id + t).utf8)) else {
+            // 세션 수립 전(연결 직후 몇 초) — 조용히 버리지 않고 미전달로 표시
+            append(ChatMessage(mine: true, text: t, wireId: id, delivery: .failed)); return
+        }
         transport.send(Data(wire.utf8))
         append(ChatMessage(mine: true, text: t, wireId: id, delivery: .pending))
         // 10초 안에 ACK 가 없으면 미전달
@@ -299,6 +314,8 @@ final class RadioModel: ObservableObject, RadioTransportListener {
             setDelivery(id, to: .delivered)                         // 이미 미전달이어도 전달로
         case .legacy(let text):
             append(ChatMessage(mine: false, text: text))
+        case .hello:
+            break                                                   // 세션 수립용, 표시 안 함
         }
     }
 
@@ -358,6 +375,10 @@ final class RadioModel: ObservableObject, RadioTransportListener {
         switch tag {
         case "K":   // initiator: 상대 프리키로 세션 열기 (첫 send가 PreKey wire가 됨)
             session = try? me.openSession(theirIdB64: theirKey, theirPrekeyB64: body)
+            // 곧바로 개시 신호를 보내 responder 쪽 세션도 수립시킨다 (먼저 말 걸 수 있도록)
+            if let sess = session, let wire = try? sess.encrypt(plaintext: Data(InnerFrame.helloText.utf8)) {
+                transport.send(Data(wire.utf8))
+            }
         case "P":   // PreKey: 기존 세션으로 먼저 복호화, 실패하거나 세션이 없으면 새 세션 수락 + 첫 평문
             if let sess = session, let d = try? sess.decrypt(wire: s) {
                 receive(d)

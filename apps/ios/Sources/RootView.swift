@@ -203,6 +203,7 @@ private struct SettingsView: View {
     @State private var saved = false
     @State private var confirmClear = false
     @State private var cleared = false
+    @State private var confirmRegen = false
 
     var body: some View {
         ScrollView {
@@ -265,6 +266,19 @@ private struct SettingsView: View {
                     }
                     if cleared {
                         Text("기록을 지웠습니다.").font(.caption).foregroundColor(.scrGrn)
+                    }
+                }.padding(14).background(Color.scrLine.opacity(0.5)).cornerRadius(12)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("신원키").font(.caption).foregroundColor(.scrDim)
+                    if confirmRegen {
+                        Text("정말 재생성할까요? 기존 세션·신뢰가 초기화됩니다.").font(.caption).foregroundColor(.scrRed)
+                        HStack(spacing: 10) {
+                            Button("취소") { confirmRegen = false }.buttonStyle(Ghost())
+                            Button("재생성") { confirmRegen = false; m.regenerate() }.buttonStyle(Danger())
+                        }
+                    } else {
+                        Button("신원키 재생성") { confirmRegen = true }.buttonStyle(Danger())
                     }
                 }.padding(14).background(Color.scrLine.opacity(0.5)).cornerRadius(12)
             }.padding(20)

@@ -44,10 +44,17 @@ enum IdentityStore {
         return try create(context: context)
     }
 
-    /// 신원키 재생성 — 기존 저장 삭제 후 새로 생성·저장.
-    static func reset(context: LAContext) throws -> Identity {
+    /// 신원키 삭제 — Keychain 키·pickle 파일·검증 기록을 지운다.
+    /// 다음 잠금 해제(인증) 때 loadOrCreate 가 새 신원을 만들어 봉인한다 (Android wipe 와 동일 흐름).
+    static func wipe() {
+        let q: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+        ]
+        SecItemDelete(q as CFDictionary)
+        try? FileManager.default.removeItem(at: pickleURL)
         VerifiedPeers.clear()   // 내 키가 바뀌므로 검증 기록도 무효 (PRD F-T3)
-        return try create(context: context)
     }
 
     // MARK: - 내부
