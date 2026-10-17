@@ -65,6 +65,38 @@ final class RadioModel: ObservableObject, RadioTransportListener {
         }
     }
 
+    /// 잠금: 전송 중단, 신원·세션·대화를 메모리에서 버리고 잠금 화면으로.
+    func lock(reason: String? = nil) {
+        transport.stop()
+        session = nil; theirKey = ""
+        discovered = []; messages = []; linked = false; safetyConfirmed = false
+        safetyNumber = ""; peerName = ""
+        me = nil
+        backgroundAt = nil
+        unlockError = reason
+        screen = .lock
+    }
+
+    // MARK: - 백그라운드 재잠금 (PRD F-K6)
+    static let relockAfter: TimeInterval = 30
+    private var backgroundAt: Date?
+
+    var isUnlocked: Bool { me != nil }
+
+    func appDidEnterBackground() {
+        if me != nil { backgroundAt = Date() }
+    }
+
+    func appWillEnterForeground() {
+        guard me != nil, let t = backgroundAt else { return }
+        backgroundAt = nil
+        let away = Date().timeIntervalSince(t)
+        // 시계를 되돌린 경우(음수)도 잠근다
+        if away >= Self.relockAfter || away < 0 {
+            lock(reason: "\(Int(Self.relockAfter))초 이상 자리를 비워 잠겼습니다.")
+        }
+    }
+
     func selectChannel(_ n: Int) {
         channel = n
         transport.stop()
@@ -89,6 +121,7 @@ final class RadioModel: ObservableObject, RadioTransportListener {
     // MARK: - RadioTransportListener (전송 → 메인 액터)
     nonisolated func onPeerFound(_ peer: MCPeerID, theirIdentityPubB64: String) {
         Task { @MainActor in
+            guard self.me != nil else { return }   // 잠긴 뒤 도착한 콜백 무시
             self.theirKey = theirIdentityPubB64
             self.peerName = peer.displayName
             if !theirIdentityPubB64.isEmpty,

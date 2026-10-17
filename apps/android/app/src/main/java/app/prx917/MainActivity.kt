@@ -4,6 +4,7 @@ import android.Manifest
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
@@ -48,8 +50,13 @@ private val GRN = Color(0xFF8FAE5A)
 private val RED = Color(0xFFD4703F)
 
 class MainActivity : FragmentActivity() {
+    // Compose 의 viewModel() 과 같은 인스턴스(같은 ViewModelStore·기본 키)
+    private val vm by lazy { ViewModelProvider(this)[RadioViewModel::class.java] }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 최근 앱 미리보기·스크린샷에 대화가 남지 않게
+        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         setContent {
             val vm: RadioViewModel = viewModel()
             val launcher = rememberLauncherForActivityResult(
@@ -59,6 +66,9 @@ class MainActivity : FragmentActivity() {
             App(vm)
         }
     }
+
+    override fun onStart() { super.onStart(); vm.onAppForeground() }
+    override fun onStop() { super.onStop(); vm.onAppBackground() }
 }
 
 private fun neededPermissions(): Array<String> {

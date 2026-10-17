@@ -3,6 +3,7 @@ package app.prx917
 import android.app.Application
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
@@ -86,14 +87,35 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
 
     /** 신원키 재생성 — 기존 세션·신뢰 초기화 후 새 Identity 생성. */
     fun regenerate() {
+        // 새 신원 생성에도 인증이 필요하므로: 삭제 후 잠금 화면에서 재인증 → 신규 봉인
+        IdentityStore.wipe(getApplication())
+        lock("신원키를 삭제했습니다. 인증하면 새 신원키가 생성됩니다.")
+    }
+
+    /** 잠금: 전송 중단, 신원·세션·대화를 메모리에서 버리고 잠금 화면으로. */
+    fun lock(msg: String = "") {
         transport.stop()
         session = null; theirKey = ""; safetyConfirmed = false
         discovered.clear(); messages.clear(); linked.value = false
-        // 새 신원 생성에도 인증이 필요하므로: 삭제 후 잠금 화면에서 재인증 → 신규 봉인
-        IdentityStore.wipe(getApplication())
+        safetyNumber.value = ""; peerName.value = ""; scannedInfo.value = ""
         identity = null
-        lockMsg.value = "신원키를 삭제했습니다. 인증하면 새 신원키가 생성됩니다."
+        backgroundAt = 0L
+        lockMsg.value = msg
         screen.value = Screen.LOCK
+    }
+
+    // 백그라운드 재잠금 (PRD F-K6). elapsedRealtime 은 기기 절전 시간도 포함한다.
+    private var backgroundAt = 0L
+
+    fun onAppBackground() {
+        if (identity != null) backgroundAt = SystemClock.elapsedRealtime()
+    }
+
+    fun onAppForeground() {
+        if (identity == null || backgroundAt == 0L) return
+        val away = SystemClock.elapsedRealtime() - backgroundAt
+        backgroundAt = 0L
+        if (away >= RELOCK_AFTER_MS) lock("${RELOCK_AFTER_MS / 1000}초 이상 자리를 비워 잠겼습니다.")
     }
 
     fun selectChannel(n: Int) {
@@ -111,7 +133,7 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
 
     /** QR로 상대 신원키를 받았을 때 — 사전 신뢰(안전번호 미리 계산). */
     fun onScannedPeer(theirPubB64: String) {
-        if (theirPubB64.isBlank()) return
+        if (theirPubB64.isBlank() || identity == null) return
         theirKey = theirPubB64
         val sn = runCatching { me.safetyNumberWith(theirPubB64) }.getOrNull()
         scannedInfo.value = "수신: IK " + theirPubB64.take(6) + "… · 안전번호 " + (sn ?: "?")
@@ -126,8 +148,15 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
 
     override fun onCleared() { transport.stop() }
 
+    companion object {
+        const val RELOCK_AFTER_MS = 30_000L
+    }
+
     // 전송 콜백 → 메인 스레드
-    private fun ui(block: () -> Unit) { Handler(Looper.getMainLooper()).post(block) }
+    // 잠긴 뒤 도착한 콜백은 버린다(신원 없음).
+    private fun ui(block: () -> Unit) {
+        Handler(Looper.getMainLooper()).post { if (identity != null) block() }
+    }
 
     override fun onPeerFound(peerId: String, theirIdentityPubB64: String) = ui {
         theirKey = theirIdentityPubB64
