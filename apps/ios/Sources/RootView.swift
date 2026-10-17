@@ -147,7 +147,11 @@ private struct ChatView: View {
                     Text("CH \(m.channel) · 암호화됨").font(.caption2).foregroundColor(.scrDim)
                 }
                 Spacer()
-                Text(m.linked ? "🔒 E2E" : "🔴 끊김").font(.caption).foregroundColor(m.linked ? .scrGrn : .scrRed)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(m.linked ? "🔒 E2E" : "🔴 끊김").font(.caption).foregroundColor(m.linked ? .scrGrn : .scrRed)
+                    Text(m.verifiedPeer ? "✓ 검증됨" : "미검증").font(.caption2)
+                        .foregroundColor(m.verifiedPeer ? .scrGrn : .scrRed)
+                }
             }.padding(12).background(Color.scrLine)
 
             ScrollView {
@@ -155,11 +159,14 @@ private struct ChatView: View {
                     ForEach(m.messages) { msg in
                         HStack {
                             if msg.mine { Spacer() }
-                            Text(msg.text)
-                                .padding(10)
-                                .background(msg.mine ? Color.scrFg : Color.scrLine)
-                                .foregroundColor(msg.mine ? Color.scr : Color.scrFg)
-                                .cornerRadius(12)
+                            VStack(alignment: msg.mine ? .trailing : .leading, spacing: 2) {
+                                Text(msg.text)
+                                    .padding(10)
+                                    .background(msg.mine ? Color.scrFg : Color.scrLine)
+                                    .foregroundColor(msg.mine ? Color.scr : Color.scrFg)
+                                    .cornerRadius(12)
+                                if let d = msg.delivery { DeliveryLabel(state: d) }
+                            }
                             if !msg.mine { Spacer() }
                         }
                     }
@@ -177,11 +184,25 @@ private struct ChatView: View {
     }
 }
 
+/// 내 메시지 전달 상태 (PRD F-T6)
+private struct DeliveryLabel: View {
+    let state: DeliveryState
+    var body: some View {
+        switch state {
+        case .pending:   Text("⏳").font(.caption2).foregroundColor(.scrDim)
+        case .delivered: Text("✓ 전달").font(.caption2).foregroundColor(.scrGrn)
+        case .failed:    Text("! 미전달").font(.caption2).foregroundColor(.scrRed)
+        }
+    }
+}
+
 private struct SettingsView: View {
     @EnvironmentObject var m: RadioModel
     @State private var draft = ""
     @State private var error: String?
     @State private var saved = false
+    @State private var confirmClear = false
+    @State private var cleared = false
 
     var body: some View {
         ScrollView {
@@ -225,6 +246,27 @@ private struct SettingsView: View {
                     kv("암호 스택", "X25519 · ChaCha20")
                     kv("버전", appVersion)
                 }.padding(.horizontal, 14).background(Color.scrLine.opacity(0.5)).cornerRadius(12)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("검증한 상대 기록").font(.caption).foregroundColor(.scrDim)
+                    Text("안전번호를 확인한 상대는 다음 연결 때 확인을 건너뜁니다. 지우면 모두 다시 확인해야 합니다.")
+                        .font(.caption2).foregroundColor(.scrDim)
+                    if confirmClear {
+                        Text("정말 지울까요? 되돌릴 수 없습니다.").font(.caption).foregroundColor(.scrRed)
+                        HStack(spacing: 10) {
+                            Button("취소") { confirmClear = false }.buttonStyle(Ghost())
+                            Button("지우기") {
+                                m.clearVerifiedPeers(); confirmClear = false; cleared = true
+                            }.buttonStyle(Danger())
+                        }
+                    } else {
+                        Button("검증한 상대 기록 지우기") { confirmClear = true; cleared = false }
+                            .buttonStyle(Danger())
+                    }
+                    if cleared {
+                        Text("기록을 지웠습니다.").font(.caption).foregroundColor(.scrGrn)
+                    }
+                }.padding(14).background(Color.scrLine.opacity(0.5)).cornerRadius(12)
             }.padding(20)
         }
         .onAppear { draft = m.callsign; error = nil }

@@ -12,6 +12,7 @@ object Settings {
     private const val K_CALLSIGN = "callsign"
     private const val K_AUTO_DELETE = "auto_delete"
     private const val K_SOUND = "sound"
+    private const val K_VERIFIED = "verified_pairs"
 
     /** 영문 대문자·숫자·하이픈 2~12자. '|' 는 광고 이름 구분자라 금지된다. */
     private val CALLSIGN_RE = Regex("^[A-Z0-9-]{2,12}$")
@@ -37,4 +38,16 @@ object Settings {
 
     fun sound(ctx: Context) = prefs(ctx).getBoolean(K_SOUND, true)
     fun setSound(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(K_SOUND, v).apply()
+
+    // 안전번호를 확인한 (내 키, 상대 키) 쌍의 SHA-256. 키 자체는 저장하지 않는다.
+    fun isVerifiedPair(ctx: Context, hash: String) =
+        prefs(ctx).getStringSet(K_VERIFIED, emptySet())!!.contains(hash)
+
+    fun addVerifiedPair(ctx: Context, hash: String) {
+        val set = prefs(ctx).getStringSet(K_VERIFIED, emptySet())!!.toMutableSet()  // 반환 Set 은 수정 금지라 복사
+        set += hash
+        prefs(ctx).edit().putStringSet(K_VERIFIED, set).apply()
+    }
+
+    fun clearVerifiedPairs(ctx: Context) = prefs(ctx).edit().remove(K_VERIFIED).apply()
 }

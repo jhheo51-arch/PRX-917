@@ -46,6 +46,7 @@ enum IdentityStore {
 
     /// 신원키 재생성 — 기존 저장 삭제 후 새로 생성·저장.
     static func reset(context: LAContext) throws -> Identity {
+        VerifiedPeers.clear()   // 내 키가 바뀌므로 검증 기록도 무효 (PRD F-T3)
         return try create(context: context)
     }
 

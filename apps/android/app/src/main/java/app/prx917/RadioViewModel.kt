@@ -8,13 +8,48 @@ import android.os.SystemClock
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
+import java.security.MessageDigest
+import kotlin.random.Random
 import app.prx917.transport.NearbyTransport
 import app.prx917.transport.RadioTransportListener
 import uniffi.crypto_core.Identity
 import uniffi.crypto_core.SecureSession
 
 enum class Screen { LOCK, CHANNEL, DISCOVERY, SAFETY, CHAT, PAIRING, SETTINGS }
-data class ChatMsg(val mine: Boolean, val text: String, val at: Long = System.currentTimeMillis())
+enum class Delivery { NONE, PENDING, DELIVERED, FAILED }
+data class ChatMsg(
+    val mine: Boolean,
+    val text: String,
+    val at: Long = System.currentTimeMillis(),
+    val id: String = "",
+    val status: Delivery = Delivery.NONE,
+)
+
+/**
+ * 암호문 안쪽 평문 포맷 (iOS 와 동일):
+ *   "M" + id(소문자 hex 8) + text  → 메시지, 수신 측이 ACK
+ *   "A" + id                        → 전달 확인. 반드시 세션으로 암호화해 보낸다(위조 방지)
+ *   그 밖                            → 구버전 평문, ACK 없음
+ */
+private object Inner {
+    private val HEX8 = Regex("^[0-9a-f]{8}$")
+    sealed class Parsed {
+        data class Msg(val id: String, val text: String) : Parsed()
+        data class Ack(val id: String) : Parsed()
+        data class Legacy(val text: String) : Parsed()
+    }
+    fun newId() = "%08x".format(Random.nextInt())
+    fun msg(id: String, text: String) = "M$id$text"
+    fun ack(id: String) = "A$id"
+    fun parse(s: String): Parsed {
+        val id = s.drop(1).take(8)
+        if (s.length >= 9 && HEX8.matches(id)) {
+            if (s[0] == 'M') return Parsed.Msg(id, s.substring(9))
+            if (s[0] == 'A' && s.length == 9) return Parsed.Ack(id)
+        }
+        return Parsed.Legacy(s)
+    }
+}
 
 /** crypto_core(Identity/SecureSession) + NearbyTransport 를 잇는 앱 상태. */
 class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportListener {
@@ -46,6 +81,8 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
     private var session: SecureSession? = null
     private var theirKey = ""
     private var safetyConfirmed = false
+    val verifiedPeer = mutableStateOf(false)       // 이 상대와 안전번호를 확인한 적 있음
+    private val seenIds = mutableSetOf<String>()   // 세션 내 중복 수신 제거
 
     /** 내 신원 공개키(base64) — QR 페어링에 사용. */
     fun myPublicKey(): String = me.publicKey()
@@ -95,7 +132,7 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
         callsign.value = v
         transport.stop()
         transport.setDisplayName(v)
-        session = null; theirKey = ""; safetyConfirmed = false
+        session = null; theirKey = ""; safetyConfirmed = false; verifiedPeer.value = false
         discovered.clear(); peerNames.clear(); linked.value = false
         safetyNumber.value = ""; peerName.value = ""
         return null
@@ -144,6 +181,7 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
     fun regenerate() {
         // 새 신원 생성에도 인증이 필요하므로: 삭제 후 잠금 화면에서 재인증 → 신규 봉인
         IdentityStore.wipe(getApplication())
+        Settings.clearVerifiedPairs(getApplication())   // 새 신원이면 모든 상대와 재확인
         lock("신원키를 삭제했습니다. 인증하면 새 신원키가 생성됩니다.")
     }
 
@@ -152,6 +190,7 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
         transport.stop()
         session = null; theirKey = ""; safetyConfirmed = false
         discovered.clear(); peerNames.clear(); messages.clear(); linked.value = false
+        seenIds.clear(); verifiedPeer.value = false
         safetyNumber.value = ""; peerName.value = ""; scannedInfo.value = ""
         identity = null
         backgroundAt = 0L
@@ -177,11 +216,25 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
         channel.value = n
         transport.stop(); transport.setChannel(n); transport.start(me.publicKey())
         discovered.clear(); session = null; linked.value = false; safetyConfirmed = false
+        seenIds.clear(); verifiedPeer.value = false
         screen.value = Screen.DISCOVERY
     }
 
-    fun confirmSafety() { safetyConfirmed = true; screen.value = Screen.CHAT }
-    fun rejectSafety() { transport.stop(); session = null; screen.value = Screen.DISCOVERY }
+    fun confirmSafety() {
+        safetyConfirmed = true
+        verifiedPeer.value = true
+        if (theirKey.isNotEmpty()) Settings.addVerifiedPair(getApplication(), pairHash(theirKey))
+        screen.value = Screen.CHAT
+    }
+
+    /** SHA-256(내 공개키|상대 공개키). 내 신원이 바뀌면 자동으로 무효가 된다. */
+    private fun pairHash(their: String): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest("${me.publicKey()}|$their".toByteArray())
+            .joinToString("") { "%02x".format(it) }
+
+    fun clearVerified() = Settings.clearVerifiedPairs(getApplication())
+    fun rejectSafety() { transport.stop(); session = null; verifiedPeer.value = false; screen.value = Screen.DISCOVERY }
 
     /** 링크 끊김 후 같은 채널로 재탐색/재연결. */
     fun reconnect() { selectChannel(channel.value) }
@@ -197,8 +250,24 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
     fun send(text: String) {
         val t = text.trim(); if (t.isEmpty()) return
         val s = session ?: return
-        transport.send(s.encrypt(t.toByteArray()).toByteArray())
-        addMessage(ChatMsg(true, t))
+        val id = Inner.newId()
+        transport.send(s.encrypt(Inner.msg(id, t).toByteArray()).toByteArray())
+        addMessage(ChatMsg(true, t, id = id, status = Delivery.PENDING))
+        // 10초 안에 ACK 가 없으면 미전달
+        main.postDelayed({ setStatus(id, Delivery.FAILED, onlyIf = Delivery.PENDING) }, ACK_TIMEOUT_MS)
+    }
+
+    private fun setStatus(id: String, to: Delivery, onlyIf: Delivery? = null) {
+        val i = messages.indexOfFirst { it.mine && it.id == id }
+        if (i < 0) return
+        if (onlyIf != null && messages[i].status != onlyIf) return
+        messages[i] = messages[i].copy(status = to)
+    }
+
+    private fun failPending() {
+        for (i in messages.indices) {
+            if (messages[i].status == Delivery.PENDING) messages[i] = messages[i].copy(status = Delivery.FAILED)
+        }
     }
 
     override fun onCleared() { main.removeCallbacks(purgeTick); transport.stop() }
@@ -206,6 +275,7 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
     companion object {
         const val RELOCK_AFTER_MS = 30_000L
         const val AUTO_DELETE_AFTER_MS = 24 * 60 * 60 * 1000L
+        const val ACK_TIMEOUT_MS = 10_000L
     }
 
     // 전송 콜백 → 메인 스레드
@@ -227,21 +297,49 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
         peerName.value = peerNames[peerId] ?: peerId
         // 역할 결정(양측 자동연결 대비): 공개키가 큰 쪽이 프리키 먼저 공개(responder)
         if (me.publicKey() > theirKey) transport.send(("K" + me.generatePrekey()).toByteArray())
+        // 예전에 안전번호를 확인한 상대면 재확인 생략
+        if (!safetyConfirmed && theirKey.isNotEmpty() &&
+            Settings.isVerifiedPair(getApplication(), pairHash(theirKey))) {
+            safetyConfirmed = true
+            verifiedPeer.value = true
+            screen.value = Screen.CHAT
+        }
         if (!safetyConfirmed) screen.value = Screen.SAFETY
     }
 
     override fun onFrameReceived(peerId: String, frame: ByteArray) = ui { handle(frame) }
-    override fun onDisconnected(peerId: String) = ui { linked.value = false }
+    override fun onDisconnected(peerId: String) = ui { linked.value = false; failPending() }
 
-    private fun handle(frame: ByteArray) {
+    // 복호화 실패(변조·재전송 등)는 조용히 버린다 — 예외로 앱이 죽지 않게.
+    private fun handle(frame: ByteArray) = runCatching {
         val s = frame.decodeToString()
         when (s.firstOrNull()) {
             'K' -> session = me.openSession(theirKey, s.substring(1))     // initiator
-            'P' -> me.acceptSession(theirKey, s).also {                   // responder
-                session = it
-                it.takeFirstMessage()?.let { m -> addMessage(ChatMsg(false, m.decodeToString())) }
+            'P' -> {
+                // 상대가 답을 받기 전 연달아 보낸 PreKey 메시지는 기존 세션으로 푼다
+                val existing = session?.let { runCatching { it.decrypt(s) }.getOrNull() }
+                if (existing != null) onInner(existing.decodeToString())
+                else me.acceptSession(theirKey, s).also {                // responder
+                    session = it
+                    seenIds.clear()
+                    it.takeFirstMessage()?.let { m -> onInner(m.decodeToString()) }
+                }
             }
-            'N' -> session?.let { addMessage(ChatMsg(false, it.decrypt(s).decodeToString())) }
+            'N' -> session?.let { onInner(it.decrypt(s).decodeToString()) }
+        }
+        Unit
+    }
+
+    private fun onInner(plain: String) {
+        when (val p = Inner.parse(plain)) {
+            is Inner.Parsed.Msg -> {
+                val s = session ?: return
+                // ACK 는 중복이어도 다시 보낸다(첫 ACK 가 유실됐을 수 있음)
+                transport.send(s.encrypt(Inner.ack(p.id).toByteArray()).toByteArray())
+                if (seenIds.add(p.id)) addMessage(ChatMsg(false, p.text, id = p.id))
+            }
+            is Inner.Parsed.Ack -> setStatus(p.id, Delivery.DELIVERED)
+            is Inner.Parsed.Legacy -> addMessage(ChatMsg(false, p.text))
         }
     }
 }

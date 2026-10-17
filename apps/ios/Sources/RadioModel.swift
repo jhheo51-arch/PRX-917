@@ -3,14 +3,65 @@ import MultipeerConnectivity
 import LocalAuthentication
 import AudioToolbox
 import UIKit
+import CryptoKit
 
 enum Screen { case lock, channel, discovery, safety, chat, settings }
+
+enum DeliveryState { case pending, delivered, failed }
 
 struct ChatMessage: Identifiable {
     let id = UUID()
     let mine: Bool
     let text: String
     var at = Date()                                // 자동삭제(24h) 기준 시각
+    var wireId: String? = nil                      // 전달 확인용 메시지 id (소문자 16진 8자)
+    var delivery: DeliveryState? = nil             // 내 메시지만 사용
+}
+
+/// 암호문 안쪽 평문 포맷 (PRD F-T6, Android 와 동일).
+///   "M" + id(소문자 16진 8자) + 본문 : 메시지
+///   "A" + id                        : 전달 확인(ACK) — 반드시 세션 암호화로 보낸다
+///   그 밖                            : 구버전 평문 (그대로 표시, ACK 없음)
+enum InnerFrame {
+    case message(id: String, text: String)
+    case ack(id: String)
+    case legacy(String)
+
+    static func newId() -> String { String(format: "%08x", UInt32.random(in: .min ... .max)) }
+
+    private static func isHexId(_ s: Substring) -> Bool {
+        s.count == 8 && s.allSatisfy { "0123456789abcdef".contains($0) }
+    }
+
+    static func parse(_ t: String) -> InnerFrame {
+        guard let tag = t.first else { return .legacy(t) }
+        let rest = t.dropFirst()
+        let id = rest.prefix(8)
+        switch tag {
+        case "M" where isHexId(id): return .message(id: String(id), text: String(rest.dropFirst(8)))
+        case "A" where isHexId(id) && rest.count == 8: return .ack(id: String(id))
+        default: return .legacy(t)
+        }
+    }
+}
+
+/// 안전번호를 확인한 상대 기록 (PRD F-T3). 키 자체가 아니라 (내 키|상대 키) 의 SHA-256 만 저장한다.
+enum VerifiedPeers {
+    private static let key = "verified_pairs"
+    private static let d = UserDefaults.standard
+
+    static func hash(mine: String, theirs: String) -> String {
+        SHA256.hash(data: Data((mine + "|" + theirs).utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+    static func contains(mine: String, theirs: String) -> Bool {
+        (d.stringArray(forKey: key) ?? []).contains(hash(mine: mine, theirs: theirs))
+    }
+    static func add(mine: String, theirs: String) {
+        var a = d.stringArray(forKey: key) ?? []
+        let h = hash(mine: mine, theirs: theirs)
+        if !a.contains(h) { a.append(h); d.set(a, forKey: key) }
+    }
+    static func clear() { d.removeObject(forKey: key) }
 }
 
 /// 비밀이 아닌 사용자 설정 — UserDefaults 저장 (Android SharedPreferences 와 같은 규칙).
@@ -61,6 +112,9 @@ final class RadioModel: ObservableObject, RadioTransportListener {
     @Published var linked = false
     @Published var unlocking = false
     @Published var unlockError: String?
+    @Published var verifiedPeer = false            // 이 상대의 안전번호를 (이전에 또는 방금) 확인함
+    static let ackTimeout: TimeInterval = 10
+    private var seenIds = Set<String>()            // 세션별 수신 메시지 id (중복 제거)
 
     @Published private(set) var callsign = AppSettings.callsign
     @Published var autoDelete = AppSettings.autoDelete {
@@ -101,7 +155,7 @@ final class RadioModel: ObservableObject, RadioTransportListener {
         callsign = c
         transport.stop()
         transport = MultipeerTransport(displayName: c, listener: self)
-        session = nil; theirKey = ""
+        session = nil; theirKey = ""; seenIds = []; verifiedPeer = false
         discovered = []; messages = []; linked = false; safetyConfirmed = false
         safetyNumber = ""; peerName = ""
         screen = .channel
@@ -157,7 +211,7 @@ final class RadioModel: ObservableObject, RadioTransportListener {
     /// 잠금: 전송 중단, 신원·세션·대화를 메모리에서 버리고 잠금 화면으로.
     func lock(reason: String? = nil) {
         transport.stop()
-        session = nil; theirKey = ""
+        session = nil; theirKey = ""; seenIds = []; verifiedPeer = false
         discovered = []; messages = []; linked = false; safetyConfirmed = false
         safetyNumber = ""; peerName = ""
         me = nil
@@ -192,19 +246,60 @@ final class RadioModel: ObservableObject, RadioTransportListener {
         transport.setChannel(n)
         guard let me else { return }
         transport.start(myIdentityPubB64: me.publicKey())
-        discovered = []; session = nil; linked = false; safetyConfirmed = false
+        discovered = []; session = nil; seenIds = []; linked = false; safetyConfirmed = false
+        verifiedPeer = false
         screen = .discovery
     }
 
-    func confirmSafety() { safetyConfirmed = true; screen = .chat }
-    func rejectSafety() { transport.stop(); session = nil; screen = .discovery }
+    func confirmSafety() {
+        if let me, !theirKey.isEmpty { VerifiedPeers.add(mine: me.publicKey(), theirs: theirKey) }
+        safetyConfirmed = true; verifiedPeer = true
+        screen = .chat
+    }
+    func rejectSafety() {
+        transport.stop(); session = nil; seenIds = []; verifiedPeer = false
+        screen = .discovery
+    }
+
+    /// 설정: 검증한 상대 기록 전체 삭제. 다음 연결부터 안전번호를 다시 확인한다.
+    /// 신원키 재생성/초기화 경로를 만들 때도 반드시 호출할 것.
+    func clearVerifiedPeers() { VerifiedPeers.clear() }
 
     func send(_ text: String) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let id = InnerFrame.newId()
         guard !t.isEmpty, let sess = session,
-              let wire = try? sess.encrypt(plaintext: Data(t.utf8)) else { return }
+              let wire = try? sess.encrypt(plaintext: Data(("M" + id + t).utf8)) else { return }
         transport.send(Data(wire.utf8))
-        append(ChatMessage(mine: true, text: t))
+        append(ChatMessage(mine: true, text: t, wireId: id, delivery: .pending))
+        // 10초 안에 ACK 가 없으면 미전달
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(Self.ackTimeout * 1_000_000_000))
+            self?.setDelivery(id, onlyIf: .pending, to: .failed)
+        }
+    }
+
+    private func setDelivery(_ id: String, onlyIf from: DeliveryState? = nil, to: DeliveryState) {
+        guard let i = messages.firstIndex(where: { $0.mine && $0.wireId == id }) else { return }
+        if let from, messages[i].delivery != from { return }
+        messages[i].delivery = to
+    }
+
+    /// 복호화된 안쪽 평문 처리: 메시지 표시+ACK / ACK 반영 / 구버전 평문 표시.
+    private func receive(_ plain: Data) {
+        guard let t = String(data: plain, encoding: .utf8) else { return }
+        switch InnerFrame.parse(t) {
+        case .message(let id, let text):
+            guard seenIds.insert(id).inserted else { return }      // 중복 수신 무시
+            append(ChatMessage(mine: false, text: text, wireId: id))
+            if let sess = session, let wire = try? sess.encrypt(plaintext: Data(("A" + id).utf8)) {
+                transport.send(Data(wire.utf8))                     // ACK 도 세션 암호화
+            }
+        case .ack(let id):
+            setDelivery(id, to: .delivered)                         // 이미 미전달이어도 전달로
+        case .legacy(let text):
+            append(ChatMessage(mine: false, text: text))
+        }
     }
 
     // MARK: - RadioTransportListener (전송 → 메인 액터)
@@ -232,7 +327,15 @@ final class RadioModel: ObservableObject, RadioTransportListener {
             if amResponder, let pk = try? me.generatePrekey() {
                 self.transport.send(Data(("K" + pk).utf8))
             }
-            if !self.safetyConfirmed { self.screen = .safety }
+            if !self.theirKey.isEmpty,
+               VerifiedPeers.contains(mine: me.publicKey(), theirs: self.theirKey) {
+                // 이전에 안전번호를 확인한 상대 — 재확인 생략 (PRD F-T3)
+                self.safetyConfirmed = true; self.verifiedPeer = true
+                self.screen = .chat
+            } else if !self.safetyConfirmed {
+                self.verifiedPeer = false
+                self.screen = .safety
+            }
         }
     }
 
@@ -241,7 +344,12 @@ final class RadioModel: ObservableObject, RadioTransportListener {
     }
 
     nonisolated func onDisconnected(_ peer: MCPeerID) {
-        Task { @MainActor in self.linked = false }
+        Task { @MainActor in
+            self.linked = false
+            for i in self.messages.indices where self.messages[i].delivery == .pending {
+                self.messages[i].delivery = .failed
+            }
+        }
     }
 
     private func handle(_ frame: Data) {
@@ -250,18 +358,15 @@ final class RadioModel: ObservableObject, RadioTransportListener {
         switch tag {
         case "K":   // initiator: 상대 프리키로 세션 열기 (첫 send가 PreKey wire가 됨)
             session = try? me.openSession(theirIdB64: theirKey, theirPrekeyB64: body)
-        case "P":   // responder: 세션 수락 + 첫 평문
-            if let sess = try? me.acceptSession(theirIdB64: theirKey, wire: s) {
-                session = sess
-                if let d = sess.takeFirstMessage(), let t = String(data: d, encoding: .utf8) {
-                    append(ChatMessage(mine: false, text: t))
-                }
+        case "P":   // PreKey: 기존 세션으로 먼저 복호화, 실패하거나 세션이 없으면 새 세션 수락 + 첫 평문
+            if let sess = session, let d = try? sess.decrypt(wire: s) {
+                receive(d)
+            } else if let sess = try? me.acceptSession(theirIdB64: theirKey, wire: s) {
+                session = sess; seenIds = []
+                if let d = sess.takeFirstMessage() { receive(d) }
             }
         case "N":
-            if let sess = session, let d = try? sess.decrypt(wire: s),
-               let t = String(data: d, encoding: .utf8) {
-                append(ChatMessage(mine: false, text: t))
-            }
+            if let sess = session, let d = try? sess.decrypt(wire: s) { receive(d) }
         default: break
         }
     }

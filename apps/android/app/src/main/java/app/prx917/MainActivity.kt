@@ -280,7 +280,11 @@ private fun ChatScreen(vm: RadioViewModel) {
             Text("←", color = FG, modifier = Modifier.clickable { vm.screen.value = Screen.DISCOVERY }.padding(end = 10.dp))
             Column {
                 Text(vm.peerName.value.ifEmpty { "상대" }, color = FG, fontWeight = FontWeight.Bold)
-                Text("CH ${vm.channel.value} · 암호화됨", color = DIM, fontSize = 11.sp)
+                Row {
+                    Text("CH ${vm.channel.value} · 암호화됨 · ", color = DIM, fontSize = 11.sp)
+                    if (vm.verifiedPeer.value) Text("✓ 검증됨", color = GRN, fontSize = 11.sp)
+                    else Text("미검증", color = RED, fontSize = 11.sp)
+                }
             }
             Spacer(Modifier.weight(1f))
             Text(if (vm.linked.value) "🔒 E2E" else "🔴 끊김", color = if (vm.linked.value) GRN else RED, fontSize = 12.sp)
@@ -298,9 +302,9 @@ private fun ChatScreen(vm: RadioViewModel) {
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(14.dp)) {
             items(vm.messages) { msg ->
-                Row(
+                Column(
                     Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    horizontalArrangement = if (msg.mine) Arrangement.End else Arrangement.Start
+                    horizontalAlignment = if (msg.mine) Alignment.End else Alignment.Start
                 ) {
                     Text(
                         msg.text,
@@ -309,6 +313,12 @@ private fun ChatScreen(vm: RadioViewModel) {
                             .background(if (msg.mine) FG else LINE, RoundedCornerShape(12.dp))
                             .padding(10.dp)
                     )
+                    when (msg.status) {
+                        Delivery.PENDING -> Text("⏳ 전송 중", color = DIM, fontSize = 10.sp)
+                        Delivery.DELIVERED -> Text("✓ 전달", color = GRN, fontSize = 10.sp)
+                        Delivery.FAILED -> Text("! 미전달", color = RED, fontSize = 10.sp)
+                        Delivery.NONE -> {}
+                    }
                 }
             }
         }
@@ -367,6 +377,7 @@ private fun PairingScreen(vm: RadioViewModel) {
 @Composable
 private fun SettingsScreen(vm: RadioViewModel) {
     var confirmRegen by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf(vm.callsign.value) }
     var err by remember { mutableStateOf("") }
@@ -416,6 +427,17 @@ private fun SettingsScreen(vm: RadioViewModel) {
         KV("암호 스택", "X25519 · ChaCha20")
         KV("버전", "0.1 · debug")
         Spacer(Modifier.height(16.dp))
+        if (!confirmClear) {
+            Ghost("검증한 상대 기록 지우기") { confirmClear = true }
+        } else {
+            Text("지우면 다음 연결부터 모든 상대와 안전번호를 다시 확인합니다.", color = RED, fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.weight(1f)) { Ghost("취소") { confirmClear = false } }
+                Box(Modifier.weight(1f)) { Danger("지우기") { vm.clearVerified(); confirmClear = false } }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
         if (!confirmRegen) {
             Danger("신원키 재생성") { confirmRegen = true }
         } else {

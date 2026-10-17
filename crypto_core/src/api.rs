@@ -280,4 +280,72 @@ mod tests {
         let bad = String::from_utf8(bad).unwrap();
         assert!(bob.accept_session(&alice.public_key(), &bad).is_err());
     }
+
+    /// 답장을 받기 전 연달아 보낸 PreKey 메시지는 이미 수락한 세션의 decrypt()로 풀린다.
+    /// (앱의 'P' 프레임 처리가 이 성질에 의존한다)
+    #[test]
+    fn 연속_prekey_메시지는_기존_세션으로_복호화된다() {
+        let mut bob = Identity::generate();
+        let bob_pk = bob.generate_prekey().unwrap();
+        let alice = Identity::generate();
+
+        let mut a_sess = alice.outbound_session(&bob.public_key(), &bob_pk).unwrap();
+        let w1 = a_sess.encrypt(b"first").unwrap();
+        let w2 = a_sess.encrypt(b"second").unwrap();
+        assert!(w1.starts_with('P') && w2.starts_with('P'));
+
+        let (mut b_sess, first) = bob.accept_session(&alice.public_key(), &w1).unwrap();
+        assert_eq!(first, b"first");
+        assert_eq!(b_sess.decrypt(&w2).unwrap(), b"second");
+    }
+
+    /// 같은 wire를 다시 보내면(재전송 공격) 거부된다.
+    #[test]
+    fn 재전송된_메시지는_거부된다() {
+        let mut bob = Identity::generate();
+        let bob_pk = bob.generate_prekey().unwrap();
+        let alice = Identity::generate();
+        let (mut a_sess, w0) = alice.start_session(&bob.public_key(), &bob_pk, b"hi").unwrap();
+        let (mut b_sess, _) = bob.accept_session(&alice.public_key(), &w0).unwrap();
+
+        let reply = b_sess.encrypt(b"ack").unwrap();
+        a_sess.decrypt(&reply).unwrap();
+        let w = a_sess.encrypt(b"once").unwrap();
+        assert_eq!(b_sess.decrypt(&w).unwrap(), b"once");
+        assert!(b_sess.decrypt(&w).is_err());
+    }
+
+    /// 순서가 뒤바뀌어 도착해도 각 메시지가 정확히 복호화된다.
+    #[test]
+    fn 순서가_바뀐_메시지도_복호화된다() {
+        let mut bob = Identity::generate();
+        let bob_pk = bob.generate_prekey().unwrap();
+        let alice = Identity::generate();
+        let (mut a_sess, w0) = alice.start_session(&bob.public_key(), &bob_pk, b"hi").unwrap();
+        let (mut b_sess, _) = bob.accept_session(&alice.public_key(), &w0).unwrap();
+        a_sess.decrypt(&b_sess.encrypt(b"ack").unwrap()).unwrap();
+
+        let w1 = a_sess.encrypt(b"one").unwrap();
+        let w2 = a_sess.encrypt(b"two").unwrap();
+        assert_eq!(b_sess.decrypt(&w2).unwrap(), b"two");
+        assert_eq!(b_sess.decrypt(&w1).unwrap(), b"one");
+    }
+
+    /// 1바이트라도 변조되면 복호화가 실패한다(AEAD 무결성).
+    #[test]
+    fn 변조된_메시지는_거부된다() {
+        let mut bob = Identity::generate();
+        let bob_pk = bob.generate_prekey().unwrap();
+        let alice = Identity::generate();
+        let (mut a_sess, w0) = alice.start_session(&bob.public_key(), &bob_pk, b"hi").unwrap();
+        let (mut b_sess, _) = bob.accept_session(&alice.public_key(), &w0).unwrap();
+        a_sess.decrypt(&b_sess.encrypt(b"ack").unwrap()).unwrap();
+
+        let w = a_sess.encrypt(b"payload").unwrap();
+        let mut bytes = w.into_bytes();
+        let i = bytes.len() / 2;
+        bytes[i] = if bytes[i] == b'A' { b'B' } else { b'A' };
+        let tampered = String::from_utf8(bytes).unwrap();
+        assert!(b_sess.decrypt(&tampered).is_err());
+    }
 }

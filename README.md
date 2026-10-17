@@ -111,7 +111,7 @@ $env:PATH = "$mingw;$env:PATH"
 cd crypto_core
 cargo test
 ```
-현재 **테스트 23건 통과** (lib 8 · session 4 · api 7 · ffi 4).
+현재 **테스트 27건 통과** (lib 8 · session 4 · api 11 · ffi 4).
 
 ---
 
@@ -233,7 +233,7 @@ cargo run --bin uniffi-bindgen -- generate --library target\debug\crypto_core.dl
 
 ## 로드맵
 
-- [x] 보안 코어 (신원 · Double Ratchet · AEAD · 저장) — 테스트 23, 안전번호 ~100비트
+- [x] 보안 코어 (신원 · Double Ratchet · AEAD · 저장) — 테스트 27, 안전번호 ~100비트
 - [x] UniFFI 바인딩 (Swift / Kotlin)
 - [x] 전송 계층 (Nearby Connections / MultipeerConnectivity)
 - [x] UI 목업 (7화면 · 생체잠금)
@@ -243,6 +243,7 @@ cargo run --bin uniffi-bindgen -- generate --library target\debug\crypto_core.dl
 - [x] Android UI 다듬기 (목업 수준 디자인·QR 페어링·설정·재연결)
 - [x] 생체 게이팅 실연동 (Android Keystore+CryptoObject · iOS Keychain+LAContext)
 - [x] 백그라운드 30초 재잠금 · 앱 전환기 화면 가림
+- [x] 전달 확인(ACK)·미전달 표시 · 검증한 상대 기억
 - [x] iOS 클라우드 빌드 검증 (GitHub Actions · Xcode 16 · 시뮬레이터 컴파일 통과)
 - [ ] 실기기 통합 테스트 · Apple 서명/TestFlight(iOS) · 사이드로드(Android)
 - [ ] Android ↔ iOS 크로스 통신 (공통 BLE 전송)
