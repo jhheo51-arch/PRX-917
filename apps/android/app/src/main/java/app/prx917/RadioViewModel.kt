@@ -255,8 +255,8 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
     fun send(text: String) {
         val t = text.trim(); if (t.isEmpty()) return
         val id = Inner.newId()
-        val s = session ?: run {
-            // 세션 수립 전(연결 직후 몇 초) — 조용히 버리지 않고 미전달로 표시
+        val s = session?.takeIf { linked.value } ?: run {
+            // 링크 끊김 또는 세션 수립 전(연결 직후 몇 초) — 조용히 버리지 않고 즉시 미전달로 표시
             addMessage(ChatMsg(true, t, id = id, status = Delivery.FAILED)); return
         }
         transport.send(s.encrypt(Inner.msg(id, t).toByteArray()).toByteArray())

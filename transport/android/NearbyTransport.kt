@@ -4,6 +4,8 @@ package app.prx917.transport
 //    수명주기를 붙여야 동작한다. crypto_core는 이미 테스트 완료.
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.*
 import uniffi.crypto_core.Identity
@@ -28,6 +30,9 @@ class NearbyTransport(
     private var serviceId = "prx917.ch1"        // 채널 = PRC-999K 주파수 선택 대체
     private var myIdentityPubB64 = ""
     private var connectedEndpoint: String? = null
+    private val main = Handler(Looper.getMainLooper())
+    private val found = mutableMapOf<String, String>()   // endpointId → 상대 신원키 (연결 대기 중)
+    private var attempts = 0
 
     fun setChannel(n: Int) { serviceId = "prx917.ch$n" }
 
@@ -43,6 +48,8 @@ class NearbyTransport(
     }
 
     fun stop() {
+        main.removeCallbacksAndMessages(null)
+        found.clear(); attempts = 0
         client.stopAdvertising(); client.stopDiscovery()
         connectedEndpoint?.let { client.disconnectFromEndpoint(it) }
         connectedEndpoint = null
@@ -60,9 +67,28 @@ class NearbyTransport(
         override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
             val theirId = info.endpointName.substringAfter('|', "")
             listener.onPeerFound(endpointId, info.endpointName.substringBefore('|'), theirId)
-            client.requestConnection(advName(), endpointId, lifecycle)
+            found[endpointId] = theirId
+            // 양쪽이 동시에 요청하면 Nearby 가 충돌로 둘 다 닫는다 → 신원키가 작은 쪽만 먼저 요청.
+            // 상대가 나를 못 찾는 경우를 대비해, 큰 쪽도 일정 시간 뒤까지 연결이 없으면 요청한다.
+            val iRequest = theirId.isEmpty() || myIdentityPubB64 < theirId
+            schedule(endpointId, if (iRequest) 0L else FALLBACK_MS)
         }
-        override fun onEndpointLost(endpointId: String) {}
+        override fun onEndpointLost(endpointId: String) { found.remove(endpointId) }
+    }
+
+    /** 연결 요청을 delayMs 뒤에 보낸다. 실패하면 백오프 후 재시도. */
+    private fun schedule(endpointId: String, delayMs: Long) {
+        main.postDelayed({
+            if (connectedEndpoint != null || endpointId !in found) return@postDelayed
+            client.requestConnection(advName(), endpointId, lifecycle)
+                .addOnFailureListener { retry(endpointId) }
+        }, delayMs)
+    }
+
+    private fun retry(endpointId: String) {
+        if (connectedEndpoint != null || endpointId !in found || attempts >= MAX_ATTEMPTS) return
+        attempts++
+        schedule(endpointId, RETRY_BASE_MS + (0..RETRY_JITTER_MS).random())
     }
 
     private val lifecycle = object : ConnectionLifecycleCallback() {
@@ -75,8 +101,12 @@ class NearbyTransport(
         override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
             if (result.status.isSuccess) {
                 connectedEndpoint = endpointId
+                main.removeCallbacksAndMessages(null)
+                found.clear(); attempts = 0
                 client.stopAdvertising(); client.stopDiscovery()
                 listener.onConnected(endpointId)
+            } else {
+                retry(endpointId)                              // 거절·충돌·타임아웃 → 재시도
             }
         }
         override fun onDisconnected(endpointId: String) {
@@ -90,6 +120,13 @@ class NearbyTransport(
             payload.asBytes()?.let { listener.onFrameReceived(endpointId, it) }
         }
         override fun onPayloadTransferUpdate(endpointId: String, u: PayloadTransferUpdate) {}
+    }
+
+    private companion object {
+        const val FALLBACK_MS = 8_000L
+        const val RETRY_BASE_MS = 1_500L
+        const val RETRY_JITTER_MS = 2_000L
+        const val MAX_ATTEMPTS = 10
     }
 }
 

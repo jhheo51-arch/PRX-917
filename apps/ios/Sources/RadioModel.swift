@@ -280,9 +280,9 @@ final class RadioModel: ObservableObject, RadioTransportListener {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let id = InnerFrame.newId()
         guard !t.isEmpty else { return }
-        guard let sess = session,
+        guard linked, let sess = session,
               let wire = try? sess.encrypt(plaintext: Data(("M" + id + t).utf8)) else {
-            // 세션 수립 전(연결 직후 몇 초) — 조용히 버리지 않고 미전달로 표시
+            // 링크 끊김 또는 세션 수립 전(연결 직후 몇 초) — 조용히 버리지 않고 즉시 미전달로 표시
             append(ChatMessage(mine: true, text: t, wireId: id, delivery: .failed)); return
         }
         transport.send(Data(wire.utf8))
