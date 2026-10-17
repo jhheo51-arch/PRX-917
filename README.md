@@ -55,6 +55,7 @@ PRX-917/
 ├─ docs/
 │   ├─ USER_GUIDE.md          사용 가이드 (입문자용)
 │   ├─ PRD.md                 제품 요구사항 · 마일스톤
+│   ├─ TEST_CHECKLIST.md      실기기 테스트 체크리스트 (M2·M3)
 │   ├─ ARCHITECTURE.md        아키텍처 · 위협 모델 · 보안 설계
 │   └─ TRANSPORT.md           오프그리드 전송 계층 설계
 ├─ crypto_core/              Rust 공유 암호 코어 (iOS/Android 공용)
@@ -245,7 +246,7 @@ cargo run --bin uniffi-bindgen -- generate --library target\debug\crypto_core.dl
 - [x] 백그라운드 30초 재잠금 · 앱 전환기 화면 가림
 - [x] 전달 확인(ACK)·미전달 표시 · 검증한 상대 기억
 - [x] iOS 클라우드 빌드 검증 (GitHub Actions · Xcode 16 · 시뮬레이터 컴파일 통과)
-- [ ] 실기기 통합 테스트 · Apple 서명/TestFlight(iOS) · 사이드로드(Android)
+- [ ] 실기기 통합 테스트 ([체크리스트](docs/TEST_CHECKLIST.md)) · Apple 서명/TestFlight(iOS) · 사이드로드(Android)
 - [ ] Android ↔ iOS 크로스 통신 (공통 BLE 전송)
 
 ---
