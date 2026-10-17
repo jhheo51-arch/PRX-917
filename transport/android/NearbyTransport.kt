@@ -11,7 +11,7 @@ import uniffi.crypto_core.SecureSession
 
 /** 전송 계층 콜백 — 세션 글루(RadioLink)가 구현. */
 interface RadioTransportListener {
-    fun onPeerFound(peerId: String, theirIdentityPubB64: String)
+    fun onPeerFound(peerId: String, theirName: String, theirIdentityPubB64: String)
     fun onConnected(peerId: String)
     fun onFrameReceived(peerId: String, frame: ByteArray)
     fun onDisconnected(peerId: String)
@@ -20,7 +20,7 @@ interface RadioTransportListener {
 /** Nearby Connections 기반 오프그리드 1:1 전송. */
 class NearbyTransport(
     context: Context,
-    private val myDisplayName: String,
+    private var myDisplayName: String,
     private val listener: RadioTransportListener,
 ) {
     private val client: ConnectionsClient = Nearby.getConnectionsClient(context)
@@ -30,6 +30,9 @@ class NearbyTransport(
     private var connectedEndpoint: String? = null
 
     fun setChannel(n: Int) { serviceId = "prx917.ch$n" }
+
+    /** 콜사인 변경 — 다음 start() 부터 새 이름으로 광고. */
+    fun setDisplayName(name: String) { myDisplayName = name }
 
     fun start(myIdentityPubB64: String) {
         this.myIdentityPubB64 = myIdentityPubB64
@@ -56,7 +59,7 @@ class NearbyTransport(
     private val discovery = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
             val theirId = info.endpointName.substringAfter('|', "")
-            listener.onPeerFound(endpointId, theirId)
+            listener.onPeerFound(endpointId, info.endpointName.substringBefore('|'), theirId)
             client.requestConnection(advName(), endpointId, lifecycle)
         }
         override fun onEndpointLost(endpointId: String) {}
@@ -65,7 +68,7 @@ class NearbyTransport(
     private val lifecycle = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
             val theirId = info.endpointName.substringAfter('|', "")
-            listener.onPeerFound(endpointId, theirId)
+            listener.onPeerFound(endpointId, info.endpointName.substringBefore('|'), theirId)
             // info.authenticationDigits 는 전송계층 확인용. 최종 권위는 우리 안전번호.
             client.acceptConnection(endpointId, payloads)
         }
@@ -109,7 +112,7 @@ class RadioLink(
     /** "호출" 버튼 → 내가 발신자. */
     fun callPeer() { isInitiator = true }
 
-    override fun onPeerFound(peerId: String, theirIdentityPubB64: String) {
+    override fun onPeerFound(peerId: String, theirName: String, theirIdentityPubB64: String) {
         if (theirIdentityPubB64.isNotEmpty()) {
             peerIdentityB64 = theirIdentityPubB64
             onSafetyNumber(me.safetyNumberWith(theirIdentityPubB64))   // 양 화면 대조용

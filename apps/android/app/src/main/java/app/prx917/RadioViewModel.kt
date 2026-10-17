@@ -1,6 +1,7 @@
 package app.prx917
 
 import android.app.Application
+import android.media.RingtoneManager
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -13,7 +14,7 @@ import uniffi.crypto_core.Identity
 import uniffi.crypto_core.SecureSession
 
 enum class Screen { LOCK, CHANNEL, DISCOVERY, SAFETY, CHAT, PAIRING, SETTINGS }
-data class ChatMsg(val mine: Boolean, val text: String)
+data class ChatMsg(val mine: Boolean, val text: String, val at: Long = System.currentTimeMillis())
 
 /** crypto_core(Identity/SecureSession) + NearbyTransport 를 잇는 앱 상태. */
 class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportListener {
@@ -27,7 +28,9 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
     val messages = mutableStateListOf<ChatMsg>()
     val scannedInfo = mutableStateOf("")           // QR로 받은 상대 신원 표시
 
-    val callsign = "DELTA-6"
+    val callsign = mutableStateOf(Settings.callsign(app))
+    val autoDelete = mutableStateOf(Settings.autoDelete(app))
+    val sound = mutableStateOf(Settings.sound(app))
     val channels = listOf(
         1 to "917.1", 2 to "918.3", 3 to "919.5", 4 to "920.7",
         5 to "921.3", 6 to "922.1", 7 to "922.9", 8 to "923.5"
@@ -38,7 +41,8 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
     private val me: Identity get() = checkNotNull(identity) { "잠금 해제 전 신원 접근" }
     val lockMsg = mutableStateOf("")               // 잠금 화면 안내/오류
     val needsReset = mutableStateOf(false)         // Keystore 키 무효화 → 신원 재생성 필요
-    private val transport = NearbyTransport(app, callsign, this)
+    private val transport = NearbyTransport(app, callsign.value, this)
+    private val peerNames = mutableMapOf<String, String>()   // endpointId → 상대 콜사인
     private var session: SecureSession? = null
     private var theirKey = ""
     private var safetyConfirmed = false
@@ -82,6 +86,57 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
     }
 
     fun goChannel() { screen.value = Screen.CHANNEL }
+
+    /** 콜사인 변경. 오류 메시지를 돌려주고, 성공이면 null. 진행 중인 연결은 끊는다. */
+    fun changeCallsign(raw: String): String? {
+        val v = Settings.normalizeCallsign(raw) ?: return "영문 대문자·숫자·하이픈(-) 2~12자로 입력하세요."
+        if (v == callsign.value) return null
+        Settings.setCallsign(getApplication(), v)
+        callsign.value = v
+        transport.stop()
+        transport.setDisplayName(v)
+        session = null; theirKey = ""; safetyConfirmed = false
+        discovered.clear(); peerNames.clear(); linked.value = false
+        safetyNumber.value = ""; peerName.value = ""
+        return null
+    }
+
+    fun setAutoDelete(on: Boolean) {
+        Settings.setAutoDelete(getApplication(), on)
+        autoDelete.value = on
+        purgeOld()
+    }
+
+    fun setSound(on: Boolean) {
+        Settings.setSound(getApplication(), on)
+        sound.value = on
+    }
+
+    // 자동 삭제: 24시간 지난 메시지 제거. 1분마다 + 메시지 추가 때 검사.
+    private val main = Handler(Looper.getMainLooper())
+    private val purgeTick = object : Runnable {
+        override fun run() { purgeOld(); main.postDelayed(this, 60_000L) }
+    }
+    init { main.postDelayed(purgeTick, 60_000L) }
+
+    private fun purgeOld() {
+        if (!autoDelete.value) return
+        val cutoff = System.currentTimeMillis() - AUTO_DELETE_AFTER_MS
+        messages.removeAll { it.at < cutoff }
+    }
+
+    private fun addMessage(m: ChatMsg) {
+        messages.add(m)
+        purgeOld()
+        if (!m.mine && sound.value) playReceiveSound()
+    }
+
+    private fun playReceiveSound() {
+        runCatching {
+            val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            RingtoneManager.getRingtone(getApplication(), uri)?.play()
+        }
+    }
     fun goPairing() { screen.value = Screen.PAIRING }
     fun goSettings() { screen.value = Screen.SETTINGS }
 
@@ -96,7 +151,7 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
     fun lock(msg: String = "") {
         transport.stop()
         session = null; theirKey = ""; safetyConfirmed = false
-        discovered.clear(); messages.clear(); linked.value = false
+        discovered.clear(); peerNames.clear(); messages.clear(); linked.value = false
         safetyNumber.value = ""; peerName.value = ""; scannedInfo.value = ""
         identity = null
         backgroundAt = 0L
@@ -143,13 +198,14 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
         val t = text.trim(); if (t.isEmpty()) return
         val s = session ?: return
         transport.send(s.encrypt(t.toByteArray()).toByteArray())
-        messages.add(ChatMsg(true, t))
+        addMessage(ChatMsg(true, t))
     }
 
-    override fun onCleared() { transport.stop() }
+    override fun onCleared() { main.removeCallbacks(purgeTick); transport.stop() }
 
     companion object {
         const val RELOCK_AFTER_MS = 30_000L
+        const val AUTO_DELETE_AFTER_MS = 24 * 60 * 60 * 1000L
     }
 
     // 전송 콜백 → 메인 스레드
@@ -158,15 +214,17 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
         Handler(Looper.getMainLooper()).post { if (identity != null) block() }
     }
 
-    override fun onPeerFound(peerId: String, theirIdentityPubB64: String) = ui {
+    override fun onPeerFound(peerId: String, theirName: String, theirIdentityPubB64: String) = ui {
         theirKey = theirIdentityPubB64
         if (theirIdentityPubB64.isNotEmpty()) safetyNumber.value = me.safetyNumberWith(theirIdentityPubB64)
-        if (!discovered.contains(peerId)) discovered.add(peerId)
+        val name = theirName.ifBlank { peerId }
+        peerNames[peerId] = name
+        if (!discovered.contains(name)) discovered.add(name)
     }
 
     override fun onConnected(peerId: String) = ui {
         linked.value = true
-        peerName.value = peerId
+        peerName.value = peerNames[peerId] ?: peerId
         // 역할 결정(양측 자동연결 대비): 공개키가 큰 쪽이 프리키 먼저 공개(responder)
         if (me.publicKey() > theirKey) transport.send(("K" + me.generatePrekey()).toByteArray())
         if (!safetyConfirmed) screen.value = Screen.SAFETY
@@ -181,9 +239,9 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
             'K' -> session = me.openSession(theirKey, s.substring(1))     // initiator
             'P' -> me.acceptSession(theirKey, s).also {                   // responder
                 session = it
-                it.takeFirstMessage()?.let { m -> messages.add(ChatMsg(false, m.decodeToString())) }
+                it.takeFirstMessage()?.let { m -> addMessage(ChatMsg(false, m.decodeToString())) }
             }
-            'N' -> session?.let { messages.add(ChatMsg(false, it.decrypt(s).decodeToString())) }
+            'N' -> session?.let { addMessage(ChatMsg(false, it.decrypt(s).decodeToString())) }
         }
     }
 }

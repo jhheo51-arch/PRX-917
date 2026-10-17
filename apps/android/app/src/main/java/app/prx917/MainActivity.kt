@@ -345,7 +345,7 @@ private fun PairingScreen(vm: RadioViewModel) {
         Eyebrow("페어링 · 신원")
         Title("내 신원 (QR)")
         Spacer(Modifier.height(12.dp))
-        Text(vm.callsign, color = FG, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text(vm.callsign.value, color = FG, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Text(vm.myFingerprint(), color = DIM, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
         Spacer(Modifier.height(16.dp))
         Image(bitmap = qr, contentDescription = "내 신원 QR", modifier = Modifier.size(200.dp))
@@ -366,19 +366,53 @@ private fun PairingScreen(vm: RadioViewModel) {
 
 @Composable
 private fun SettingsScreen(vm: RadioViewModel) {
-    var autoDel by remember { mutableStateOf(false) }
-    var sound by remember { mutableStateOf(true) }
     var confirmRegen by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(false) }
+    var draft by remember { mutableStateOf(vm.callsign.value) }
+    var err by remember { mutableStateOf("") }
 
     Column(Modifier.fillMaxSize().padding(20.dp).verticalScrollSafe()) {
         Eyebrow("설정")
         Title("설정")
         Spacer(Modifier.height(12.dp))
-        KV("내 콜사인", vm.callsign)
+        if (!editing) {
+            Row(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("내 콜사인", color = DIM, fontSize = 13.sp)
+                Spacer(Modifier.weight(1f))
+                Text(vm.callsign.value, color = FG, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+                Text("  변경", color = GRN, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { draft = vm.callsign.value; err = ""; editing = true })
+            }
+            Divider(color = LINE)
+        } else {
+            Text("내 콜사인", color = DIM, fontSize = 13.sp, modifier = Modifier.padding(top = 9.dp))
+            TextField(
+                value = draft, onValueChange = { draft = it.uppercase().take(12) },
+                singleLine = true, modifier = Modifier.fillMaxWidth(),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = SCR, unfocusedContainerColor = SCR,
+                    focusedTextColor = FG, unfocusedTextColor = FG,
+                    focusedIndicatorColor = FG, unfocusedIndicatorColor = LINE
+                )
+            )
+            Text("영문 대문자·숫자·하이픈 2~12자. 바꾸면 지금 연결이 끊깁니다.", color = DIM, fontSize = 11.sp)
+            if (err.isNotEmpty()) Text(err, color = RED, fontSize = 12.sp)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.weight(1f)) { Ghost("취소") { editing = false } }
+                Box(Modifier.weight(1f)) {
+                    Primary("저장") {
+                        val e = vm.changeCallsign(draft)
+                        if (e == null) editing = false else err = e
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
         KV("기본 채널", "CH ${vm.channel.value}")
         KV("생체인증 잠금", "필수 · Keystore 바인딩")
-        ToggleRow("메시지 24h 후 자동 삭제", autoDel) { autoDel = it }
-        ToggleRow("수신 알림음", sound) { sound = it }
+        ToggleRow("메시지 24h 후 자동 삭제", vm.autoDelete.value) { vm.setAutoDelete(it) }
+        ToggleRow("수신 알림음", vm.sound.value) { vm.setSound(it) }
         KV("암호 스택", "X25519 · ChaCha20")
         KV("버전", "0.1 · debug")
         Spacer(Modifier.height(16.dp))

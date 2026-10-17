@@ -1,6 +1,8 @@
 import SwiftUI
 import MultipeerConnectivity
 import LocalAuthentication
+import AudioToolbox
+import UIKit
 
 enum Screen { case lock, channel, discovery, safety, chat, settings }
 
@@ -8,6 +10,41 @@ struct ChatMessage: Identifiable {
     let id = UUID()
     let mine: Bool
     let text: String
+    var at = Date()                                // 자동삭제(24h) 기준 시각
+}
+
+/// 비밀이 아닌 사용자 설정 — UserDefaults 저장 (Android SharedPreferences 와 같은 규칙).
+enum AppSettings {
+    private static let d = UserDefaults.standard
+    private static let kCallsign = "callsign", kAutoDelete = "autoDelete", kSound = "sound"
+
+    static let callsignPattern = "^[A-Z0-9-]{2,12}$"
+
+    /// 첫 실행 시 "UNIT-" + 랜덤 16진 4자리를 만들어 저장.
+    static var callsign: String {
+        get {
+            if let c = d.string(forKey: kCallsign), isValidCallsign(c) { return c }
+            let c = String(format: "UNIT-%04X", Int.random(in: 0...0xFFFF))
+            d.set(c, forKey: kCallsign)
+            return c
+        }
+        set { d.set(newValue, forKey: kCallsign) }
+    }
+    static var autoDelete: Bool {
+        get { d.object(forKey: kAutoDelete) as? Bool ?? false }
+        set { d.set(newValue, forKey: kAutoDelete) }
+    }
+    static var sound: Bool {
+        get { d.object(forKey: kSound) as? Bool ?? true }
+        set { d.set(newValue, forKey: kSound) }
+    }
+
+    static func normalize(_ raw: String) -> String {
+        raw.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    }
+    static func isValidCallsign(_ c: String) -> Bool {
+        c.range(of: callsignPattern, options: .regularExpression) != nil
+    }
 }
 
 /// crypto_core(Identity/SecureSession) + MultipeerTransport 를 잇는 앱 상태.
@@ -25,7 +62,15 @@ final class RadioModel: ObservableObject, RadioTransportListener {
     @Published var unlocking = false
     @Published var unlockError: String?
 
-    let callsign = "DELTA-6"
+    @Published private(set) var callsign = AppSettings.callsign
+    @Published var autoDelete = AppSettings.autoDelete {
+        didSet { AppSettings.autoDelete = autoDelete; purgeExpired() }
+    }
+    @Published var soundOn = AppSettings.sound {
+        didSet { AppSettings.sound = soundOn }
+    }
+    static let messageTTL: TimeInterval = 24 * 60 * 60
+    private var purgeTimer: Timer?
     let channels = [(1,"917.1"),(2,"918.3"),(3,"919.5"),(4,"920.7"),
                     (5,"921.3"),(6,"922.1"),(7,"922.9"),(8,"923.5")]
 
@@ -36,6 +81,50 @@ final class RadioModel: ObservableObject, RadioTransportListener {
 
     init() {
         transport = MultipeerTransport(displayName: callsign, listener: self)
+        // 1분마다 24h 지난 메시지 정리 (자동삭제 켜진 경우만)
+        purgeTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.purgeExpired() }
+        }
+    }
+
+    // MARK: - 설정
+
+    /// 콜사인 변경. 성공 시 nil, 실패 시 오류 문구.
+    /// MCPeerID 이름은 바꿀 수 없으므로 전송 계층을 새로 만들고, 현재 연결·세션은 끊는다.
+    func setCallsign(_ raw: String) -> String? {
+        let c = AppSettings.normalize(raw)
+        guard AppSettings.isValidCallsign(c) else {
+            return "영문 대문자·숫자·하이픈(-)으로 2~12자만 쓸 수 있습니다."
+        }
+        guard c != callsign else { return nil }
+        AppSettings.callsign = c
+        callsign = c
+        transport.stop()
+        transport = MultipeerTransport(displayName: c, listener: self)
+        session = nil; theirKey = ""
+        discovered = []; messages = []; linked = false; safetyConfirmed = false
+        safetyNumber = ""; peerName = ""
+        screen = .channel
+        return nil
+    }
+
+    func goSettings() { screen = .settings }
+    func goChannel() { screen = .channel }
+
+    /// 자동삭제가 켜져 있으면 24시간 지난 메시지를 지운다.
+    func purgeExpired() {
+        guard autoDelete else { return }
+        let cutoff = Date().addingTimeInterval(-Self.messageTTL)
+        messages.removeAll { $0.at < cutoff }
+    }
+
+    private func append(_ msg: ChatMessage) {
+        messages.append(msg)
+        purgeExpired()
+        if !msg.mine && soundOn {
+            AudioServicesPlaySystemSound(1007)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
     }
 
     var myPublicKey: String { me?.publicKey() ?? "" }
@@ -115,7 +204,7 @@ final class RadioModel: ObservableObject, RadioTransportListener {
         guard !t.isEmpty, let sess = session,
               let wire = try? sess.encrypt(plaintext: Data(t.utf8)) else { return }
         transport.send(Data(wire.utf8))
-        messages.append(ChatMessage(mine: true, text: t))
+        append(ChatMessage(mine: true, text: t))
     }
 
     // MARK: - RadioTransportListener (전송 → 메인 액터)
@@ -165,13 +254,13 @@ final class RadioModel: ObservableObject, RadioTransportListener {
             if let sess = try? me.acceptSession(theirIdB64: theirKey, wire: s) {
                 session = sess
                 if let d = sess.takeFirstMessage(), let t = String(data: d, encoding: .utf8) {
-                    messages.append(ChatMessage(mine: false, text: t))
+                    append(ChatMessage(mine: false, text: t))
                 }
             }
         case "N":
             if let sess = session, let d = try? sess.decrypt(wire: s),
                let t = String(data: d, encoding: .utf8) {
-                messages.append(ChatMessage(mine: false, text: t))
+                append(ChatMessage(mine: false, text: t))
             }
         default: break
         }

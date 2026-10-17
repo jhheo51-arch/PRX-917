@@ -22,7 +22,7 @@ struct RootView: View {
             case .discovery: DiscoveryView()
             case .safety:    SafetyView()
             case .chat:      ChatView()
-            case .settings:  ChannelView()
+            case .settings:  SettingsView()
             }
         }
         .foregroundColor(.scrFg)
@@ -60,7 +60,15 @@ private struct ChannelView: View {
     let cols = [GridItem(.flexible()), GridItem(.flexible())]
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("통신 채널").font(.title2.bold())
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("통신 채널").font(.title2.bold())
+                    Text(m.callsign).font(.caption).foregroundColor(.scrDim)
+                }
+                Spacer()
+                Button { m.goSettings() } label: { Text("⚙").font(.title2) }
+                    .accessibilityLabel("설정")
+            }
             LazyVGrid(columns: cols, spacing: 10) {
                 ForEach(m.channels, id: \.0) { ch in
                     Button { m.selectChannel(ch.0) } label: {
@@ -166,6 +174,73 @@ private struct ChatView: View {
                     .buttonStyle(Primary()).disabled(!m.linked)
             }.padding(10).background(Color.scrLine.opacity(0.5))
         }
+    }
+}
+
+private struct SettingsView: View {
+    @EnvironmentObject var m: RadioModel
+    @State private var draft = ""
+    @State private var error: String?
+    @State private var saved = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Button { m.goChannel() } label: { Text("←") }
+                        .accessibilityLabel("돌아가기")
+                    Text("설정").font(.title2.bold())
+                    Spacer()
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("내 콜사인").font(.caption).foregroundColor(.scrDim)
+                    HStack(spacing: 8) {
+                        TextField("예: ALPHA-1", text: $draft)
+                            .textInputAutocapitalization(.characters)
+                            .disableAutocorrection(true)   // iOS 15 호환
+                            .textFieldStyle(.plain).padding(10)
+                            .background(Color.scrLine).cornerRadius(10)
+                        Button("저장") {
+                            error = m.setCallsign(draft)
+                            saved = error == nil
+                            if saved { draft = m.callsign }
+                        }
+                        .buttonStyle(Primary()).frame(width: 90)
+                    }
+                    Text("영문 대문자·숫자·하이픈, 2~12자. 바꾸면 현재 연결이 끊깁니다.")
+                        .font(.caption2).foregroundColor(.scrDim)
+                    if let error {
+                        Text(error).font(.caption).foregroundColor(.scrRed)
+                    }
+                }.padding(14).background(Color.scrLine.opacity(0.5)).cornerRadius(12)
+
+                VStack(spacing: 0) {
+                    kv("기본 채널", "CH \(m.channel)")
+                    kv("생체인증 잠금", "필수 · Keychain 바인딩")
+                    Toggle("메시지 24h 후 자동 삭제", isOn: $m.autoDelete)
+                        .tint(.scrGrn).padding(.vertical, 10)
+                    Toggle("수신 알림음", isOn: $m.soundOn)
+                        .tint(.scrGrn).padding(.vertical, 10)
+                    kv("암호 스택", "X25519 · ChaCha20")
+                    kv("버전", appVersion)
+                }.padding(.horizontal, 14).background(Color.scrLine.opacity(0.5)).cornerRadius(12)
+            }.padding(20)
+        }
+        .onAppear { draft = m.callsign; error = nil }
+    }
+
+    private var appVersion: String {
+        let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1"
+        return "\(v) · debug"
+    }
+
+    private func kv(_ k: String, _ v: String) -> some View {
+        HStack {
+            Text(k)
+            Spacer()
+            Text(v).foregroundColor(.scrDim)
+        }.font(.callout).padding(.vertical, 10)
     }
 }
 
