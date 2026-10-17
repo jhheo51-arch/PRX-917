@@ -32,7 +32,11 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
         5 to "921.3", 6 to "922.1", 7 to "922.9", 8 to "923.5"
     )
 
-    private var me = IdentityStore.loadOrCreate(app)      // Keystore에서 복원 또는 신규 생성
+    // 신원은 잠금 해제(CryptoObject 인증) 후에만 로드된다. 그 전엔 null.
+    private var identity: Identity? = null
+    private val me: Identity get() = checkNotNull(identity) { "잠금 해제 전 신원 접근" }
+    val lockMsg = mutableStateOf("")               // 잠금 화면 안내/오류
+    val needsReset = mutableStateOf(false)         // Keystore 키 무효화 → 신원 재생성 필요
     private val transport = NearbyTransport(app, callsign, this)
     private var session: SecureSession? = null
     private var theirKey = ""
@@ -46,7 +50,36 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
         return "IK: " + k.take(6) + "…" + k.takeLast(4)
     }
 
-    fun unlock() { screen.value = Screen.CHANNEL }
+    /** 잠금 해제 1단계: 인증에 쓸 Cipher 준비. 키가 무효화됐으면 null + 재생성 안내. */
+    fun beginUnlock(): IdentityStore.Pending? = try {
+        IdentityStore.begin(getApplication())
+    } catch (e: IdentityStore.KeyInvalidatedException) {
+        needsReset.value = true
+        lockMsg.value = "생체 등록이 바뀌어 신원키가 무효화됐습니다. 신원을 재생성해야 합니다."
+        null
+    } catch (e: Exception) {
+        lockMsg.value = "키 준비 실패: ${e.message}"
+        null
+    }
+
+    /** 잠금 해제 2단계: 인증된 Cipher 로만 신원을 복원/생성. */
+    fun finishUnlock(p: IdentityStore.Pending, authed: javax.crypto.Cipher) {
+        try {
+            identity = IdentityStore.finish(getApplication(), p, authed)
+            lockMsg.value = ""
+            screen.value = Screen.CHANNEL
+        } catch (e: Exception) {
+            lockMsg.value = "신원 복원 실패: ${e.message}"
+        }
+    }
+
+    /** 무효화된 신원 삭제 — 다음 인증 때 새 신원이 생성된다. */
+    fun resetIdentity() {
+        IdentityStore.wipe(getApplication())
+        needsReset.value = false
+        lockMsg.value = "신원을 삭제했습니다. 다시 인증하면 새 신원키가 생성됩니다."
+    }
+
     fun goChannel() { screen.value = Screen.CHANNEL }
     fun goPairing() { screen.value = Screen.PAIRING }
     fun goSettings() { screen.value = Screen.SETTINGS }
@@ -56,7 +89,11 @@ class RadioViewModel(app: Application) : AndroidViewModel(app), RadioTransportLi
         transport.stop()
         session = null; theirKey = ""; safetyConfirmed = false
         discovered.clear(); messages.clear(); linked.value = false
-        me = IdentityStore.reset(getApplication())        // 저장소에서도 새 신원으로 교체
+        // 새 신원 생성에도 인증이 필요하므로: 삭제 후 잠금 화면에서 재인증 → 신규 봉인
+        IdentityStore.wipe(getApplication())
+        identity = null
+        lockMsg.value = "신원키를 삭제했습니다. 인증하면 새 신원키가 생성됩니다."
+        screen.value = Screen.LOCK
     }
 
     fun selectChannel(n: Int) {

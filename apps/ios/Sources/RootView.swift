@@ -39,8 +39,15 @@ private struct LockView: View {
             Text("PRX-917 잠금").font(.title2.bold())
             Text("얼굴/지문으로 신원키 잠금 해제")
                 .font(.caption).foregroundColor(.scrDim)
-            Button("얼굴 인식으로 잠금 해제") { m.unlock() }   // 실제: LAContext 생체인증 연결
+            Button(m.unlocking ? "인증 중…" : "생체인증으로 잠금 해제") {
+                Task { await m.unlock() }   // LAContext 인증 → Keychain 신원 로드 후에만 진입
+            }
                 .buttonStyle(Primary())
+                .disabled(m.unlocking)
+            if let err = m.unlockError {
+                Text(err).font(.caption).foregroundColor(.scrRed)
+                    .multilineTextAlignment(.center)
+            }
             Spacer()
             Text("생체정보는 기기를 벗어나지 않습니다")
                 .font(.caption2).foregroundColor(.scrDim)

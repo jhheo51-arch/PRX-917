@@ -24,10 +24,13 @@ targets:
         SWIFT_VERSION: "5.0"
         # MultipeerConnectivity 권한 (로컬 네트워크 + Bonjour 서비스 등록)
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: "주변 기기와 오프그리드로 교신하기 위해 사용합니다."
+        # Face ID 로 신원키(Keychain) 잠금 해제
+        INFOPLIST_KEY_NSFaceIDUsageDescription: "Face ID로 신원키 잠금을 해제합니다. 생체정보는 기기를 벗어나지 않습니다."
     info:
       path: Sources/Info.plist
       properties:
         NSLocalNetworkUsageDescription: "주변 기기와 오프그리드로 교신하기 위해 사용합니다."
+        NSFaceIDUsageDescription: "Face ID로 신원키 잠금을 해제합니다. 생체정보는 기기를 벗어나지 않습니다."
         NSBonjourServices:
           - _prx917-ch1._tcp
           - _prx917-ch1._udp

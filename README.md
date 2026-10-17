@@ -51,6 +51,7 @@ PRX-917/
 ├─ README.md                 이 문서
 ├─ LICENSE
 ├─ docs/
+│   ├─ PRD.md                 제품 요구사항 · 마일스톤
 │   ├─ ARCHITECTURE.md        아키텍처 · 위협 모델 · 보안 설계
 │   └─ TRANSPORT.md           오프그리드 전송 계층 설계
 ├─ crypto_core/              Rust 공유 암호 코어 (iOS/Android 공용)
@@ -236,8 +237,8 @@ cargo run --bin uniffi-bindgen -- generate --library target\debug\crypto_core.dl
 - [x] 하드웨어 컨셉 (3D/평면도)
 - [x] **Android 앱 빌드** (crypto_core .so 임베드 → app-debug.apk)
 - [x] iOS 앱 소스 + 클라우드 CI
-- [ ] Android UI 다듬기 (목업 수준 디자인·QR 페어링·설정·재연결)
-- [ ] BiometricPrompt / Keystore 생체 게이팅 실연동
+- [x] Android UI 다듬기 (목업 수준 디자인·QR 페어링·설정·재연결)
+- [x] 생체 게이팅 실연동 (Android Keystore+CryptoObject · iOS Keychain+LAContext)
 - [x] iOS 클라우드 빌드 검증 (GitHub Actions · Xcode 16 · 시뮬레이터 컴파일 통과)
 - [ ] 실기기 통합 테스트 · Apple 서명/TestFlight(iOS) · 사이드로드(Android)
 - [ ] Android ↔ iOS 크로스 통신 (공통 BLE 전송)

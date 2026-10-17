@@ -152,11 +152,24 @@ private fun LockScreen(vm: RadioViewModel) {
         Text("얼굴/지문으로 신원키 잠금 해제", color = DIM, fontSize = 13.sp)
         Spacer(Modifier.height(18.dp))
         val ctx = LocalContext.current
-        Primary("얼굴/지문으로 잠금 해제") {
-            (ctx as? FragmentActivity)?.let { act -> bioAuth(act) { vm.unlock() } } ?: vm.unlock()
+        if (vm.needsReset.value) {
+            Danger("신원 재생성 (기존 신원 삭제)") { vm.resetIdentity() }
+        } else {
+            Primary(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) "생체인증 또는 기기 PIN으로 잠금 해제"
+                    else "지문/얼굴로 잠금 해제") {
+                val act = ctx as? FragmentActivity ?: return@Primary
+                val why = authUnavailableReason(act)
+                if (why != null) { vm.lockMsg.value = why; return@Primary }
+                val pending = vm.beginUnlock() ?: return@Primary
+                bioAuth(act, pending.cipher,
+                    onOk = { authed -> vm.finishUnlock(pending, authed) },
+                    onErr = { vm.lockMsg.value = it })
+            }
         }
-        Spacer(Modifier.height(10.dp))
-        Ghost("기기 비밀번호 사용") { vm.unlock() }
+        if (vm.lockMsg.value.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Text(vm.lockMsg.value, color = RED, fontSize = 12.sp)
+        }
         Spacer(Modifier.height(10.dp))
         Text("생체정보는 기기를 벗어나지 않습니다", color = DIM, fontSize = 11.sp)
     }
@@ -343,7 +356,6 @@ private fun PairingScreen(vm: RadioViewModel) {
 
 @Composable
 private fun SettingsScreen(vm: RadioViewModel) {
-    var bio by remember { mutableStateOf(true) }
     var autoDel by remember { mutableStateOf(false) }
     var sound by remember { mutableStateOf(true) }
     var confirmRegen by remember { mutableStateOf(false) }
@@ -354,7 +366,7 @@ private fun SettingsScreen(vm: RadioViewModel) {
         Spacer(Modifier.height(12.dp))
         KV("내 콜사인", vm.callsign)
         KV("기본 채널", "CH ${vm.channel.value}")
-        ToggleRow("생체인증 잠금 (지문/얼굴)", bio) { bio = it }
+        KV("생체인증 잠금", "필수 · Keystore 바인딩")
         ToggleRow("메시지 24h 후 자동 삭제", autoDel) { autoDel = it }
         ToggleRow("수신 알림음", sound) { sound = it }
         KV("암호 스택", "X25519 · ChaCha20")
@@ -429,24 +441,55 @@ private fun Danger(label: String, onClick: () -> Unit) =
 private fun Modifier.verticalScrollSafe(): Modifier =
     this.then(Modifier.verticalScroll(rememberScrollState()))
 
-// 생체인증 (BiometricPrompt). 사용 불가/실패 시 호출측이 대체 버튼을 둔다.
-private fun bioAuth(activity: FragmentActivity, onOk: () -> Unit) {
-    val mgr = BiometricManager.from(activity)
-    val can = mgr.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK)
-    if (can != BiometricManager.BIOMETRIC_SUCCESS) { onOk(); return }  // 등록된 생체 없으면 바로 통과(데모)
+// 생체인증 (BiometricPrompt + CryptoObject).
+// API 30+: 강한 생체 또는 기기 PIN/패턴. API 24–29: 강한 생체만(키가 생체 전용으로 묶임).
+private fun authenticators(): Int =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+        BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+    else BiometricManager.Authenticators.BIOMETRIC_STRONG
+
+/** 인증 불가 사유(없으면 null). 생체/화면잠금 미설정이면 잠금 해제 자체를 막는다. */
+private fun authUnavailableReason(activity: FragmentActivity): String? =
+    when (BiometricManager.from(activity).canAuthenticate(authenticators())) {
+        BiometricManager.BIOMETRIC_SUCCESS -> null
+        BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                "기기에 지문/얼굴 또는 화면 잠금(PIN·패턴)을 먼저 설정하세요. 설정 전에는 잠금 해제할 수 없습니다."
+            else "기기에 강한 생체인증(지문 등)을 먼저 등록하세요. 등록 전에는 잠금 해제할 수 없습니다."
+        BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE ->
+            "이 기기는 강한 생체인증을 지원하지 않습니다."
+        BiometricManager.BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED ->
+            "보안 업데이트가 필요합니다."
+        else -> "현재 생체인증을 사용할 수 없습니다. 잠시 후 다시 시도하세요."
+    }
+
+/** 성공 콜백의 인증된 Cipher 로만 onOk 를 부른다 — 인증 없이 신원키는 열리지 않는다. */
+private fun bioAuth(
+    activity: FragmentActivity,
+    cipher: javax.crypto.Cipher,
+    onOk: (javax.crypto.Cipher) -> Unit,
+    onErr: (String) -> Unit
+) {
     val prompt = BiometricPrompt(
         activity, ContextCompat.getMainExecutor(activity),
         object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) = onOk()
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                val c = result.cryptoObject?.cipher
+                if (c != null) onOk(c) else onErr("인증 결과에 암호 객체가 없습니다.")
+            }
+            override fun onAuthenticationError(code: Int, msg: CharSequence) {
+                if (code != BiometricPrompt.ERROR_USER_CANCELED &&
+                    code != BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
+                    code != BiometricPrompt.ERROR_CANCELED) onErr(msg.toString())
+            }
         }
     )
-    val info = BiometricPrompt.PromptInfo.Builder()
+    val b = BiometricPrompt.PromptInfo.Builder()
         .setTitle("PRX-917 잠금 해제")
-        .setSubtitle("생체인증으로 신원키 접근")
-        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
-        .setNegativeButtonText("취소")
-        .build()
-    prompt.authenticate(info)
+        .setSubtitle("인증해야 신원키가 복호화됩니다")
+        .setAllowedAuthenticators(authenticators())
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) b.setNegativeButtonText("취소")
+    prompt.authenticate(b.build(), BiometricPrompt.CryptoObject(cipher))
 }
 
 // QR 생성 (ZXing)
