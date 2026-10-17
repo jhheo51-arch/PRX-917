@@ -152,7 +152,7 @@
 |---|---|
 | 보안 코어 · 바인딩 | 완료 (테스트 23건 통과) |
 | Android 앱 | 디버그 APK 빌드, UI·QR·재연결 완료. 생체 게이팅을 Keystore 키와 결합 완료(빌드 통과, 실기기 미검증) |
-| iOS 앱 | 소스 + 클라우드 CI 컴파일 통과. Keychain 신원 저장·LAContext 인증 연동 완료(CI 컴파일 미실행) |
+| iOS 앱 | 소스 + 클라우드 CI 컴파일 통과. Keychain 신원 저장·LAContext 인증 연동 완료(CI 시뮬레이터 컴파일 통과, 실기기 미검증) |
 | 크로스플랫폼 | Nearby(Android) ↔ Multipeer(iOS) 비호환 → 같은 플랫폼끼리만 교신 |
 | 실기기 검증 | 미실시 |
 
